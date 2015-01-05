@@ -1,4 +1,5 @@
 JPMeshConverter
 ===============
 
-Jurassic Park: The Game Mesh Converter
+This WPF application loads *.d3dmesh files from Telltale Games' Jurassic Park: The Game from 2011.
+Currently, only vertex and face data is supported.
