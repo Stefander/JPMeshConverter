@@ -31,18 +31,45 @@ namespace JPMeshConverter {
         /// This method will output a Wavefront OBJ file
         /// </summary>
         /// <returns>OBJ file data</returns>
-        public override string ToString() {
+        public string GetObjData() {
             StringBuilder objData = new StringBuilder();
-            
+
             foreach (Vertex v in Vertices) {
                 objData.Append("v " + v.Position.X + " " + v.Position.Y + " " + v.Position.Z + "\n");
+                objData.Append("vt " + v.UV.X + " " + v.UV.Y + "\n");
+                //objData.Append("vn " + v.Normal.X + " " + v.Normal.Y + " " + v.Normal.Z + "\n");
             }
-
-            foreach (Triangle f in Triangles) {
-                objData.Append("f " + (f.V1 + 1) + " " + (f.V2 + 1) + " " + (f.V3 + 1) + "\n");
+            foreach (MeshChunk chunk in Chunks) {
+                objData.Append("g chunk"+chunk.Index+"\n");
+                objData.Append("usemtl "+chunk.DiffuseTexture.Replace(".d3dtx","")+"\n");
+                for (uint i = chunk.FaceOffset; i < chunk.FaceOffset + chunk.FaceCount; i++) {
+                    Triangle t = Triangles[(int)i];
+                    uint v1 = t.V1 + 1;
+                    uint v2 = t.V2 + 1;
+                    uint v3 = t.V3 + 1;
+                    objData.Append("f " + v1 + "/" + v1 + " " + v2 + "/" + v2 + " " + v3 + "/" + v3 + "\n");
+                }
             }
 
             return objData.ToString();
+        }
+
+        public string GetMtlData() {
+            StringBuilder mtlData = new StringBuilder();
+            List<string> textureList = new List<string>();
+            foreach (MeshChunk chunk in Chunks) {
+                string diffuseName = chunk.DiffuseTexture.Replace(".d3dtx","");
+                if (textureList.IndexOf(diffuseName) == -1) {
+                    textureList.Add(diffuseName);
+                }
+            }
+
+            foreach (string texture in textureList) {
+                mtlData.Append("newmtl "+texture+"\n");
+                mtlData.Append("Ka 1.000 1.000 1.000\nKd 1.000 1.000 1.000\nKs 0.000 0.000 0.000\nmap_d "+texture+"\n");
+            }
+
+            return mtlData.ToString();
         }
     }
 
@@ -51,6 +78,11 @@ namespace JPMeshConverter {
     /// </summary>
     public class MeshChunk {
         public uint Index;
+        public uint FirstVertex;
+        public uint LastVertex;
+        public uint FaceOffset;
+        public uint FaceCount;
+        public string DiffuseTexture;
     }
 
     /// <summary>
@@ -59,6 +91,8 @@ namespace JPMeshConverter {
     public class Vertex {
         public uint Index;
         public Vector3 Position;
+        public Vector2 UV;
+        public Vector3 Normal;
     }
 
     /// <summary>
@@ -82,6 +116,12 @@ namespace JPMeshConverter {
             Y = y;
         }
 
+        public static Vector2 zero {
+            get {
+                return new Vector2(0,0);
+            }
+        }
+
         public override string ToString() {
             return "(" + X + "," + Y + ")";
         }
@@ -99,6 +139,12 @@ namespace JPMeshConverter {
             X = x;
             Y = y;
             Z = z;
+        }
+
+        public static Vector3 up {
+            get {
+                return new Vector3(0,0.5f,0);
+            }
         }
 
         public override string ToString() {

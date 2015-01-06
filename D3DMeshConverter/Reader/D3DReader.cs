@@ -118,6 +118,7 @@ namespace JPMeshConverter {
             uint u2 = ReadUint32(); // Unknown
             uint u3 = ReadUint32(); // Unknown
 
+            Console.WriteLine("Face data size: "+(u1/3)+" ("+u1+")");
             // Parse triangle data
             // Triangles are specified by 3 unsigned 16 bit integers
             for (int i = 0; i < u1 / 3; i++) {
@@ -135,18 +136,30 @@ namespace JPMeshConverter {
             uint vertexDataSize = ReadUint32();
 
             ReadChunk(0xAC); // Unknown
+            Console.WriteLine("Vertex count: "+vertexCount+" data size: "+(vertexCount*vertexDataSize));
 
             // Parse all vertices
             for (uint j = 0; j < vertexCount; j++) {
                 Vector3 p = ReadVector3();
-                Vertex v = new Vertex() { Index = j, Position = p };
-                MeshData.Vertices.Add(v);
-                
+
                 // TODO: Figure out what these parameters are (UV, normal?)
-                for (uint i = 0; i < (vertexDataSize - 0xC) / 4; i++) {
-                    byte[] chunkData = ReadChunk(4);
+                uint chunkSize = vertexDataSize - 0xC;
+                byte[] chunkData = ReadChunk(chunkSize);
+
+                Vector2 uv = Vector2.zero;
+                Vector3 normal = Vector3.up;
+
+                if (chunkSize >= 4) {
+                    uv = new Vector2(ReadFloat16(chunkData, 0x0), 1-ReadFloat16(chunkData,0x2));
                 }
+
+                Vertex v = new Vertex() { Index = j, Position = p, UV = uv, Normal = normal };
+                MeshData.Vertices.Add(v);
             }
+        }
+
+        private float ReadFloat16(byte[] data, uint offset) {
+            return (ReadUint16(data, offset) / (float)UInt16.MaxValue)*2;
         }
 
         /// <summary>
@@ -160,10 +173,10 @@ namespace JPMeshConverter {
 
             ReadChunk(0x24);
 
-            uint unknown = ReadUint32();
-            uint size1 = ReadUint32();
-            ReadUint32();
-            uint size2 = ReadUint32();
+            chunk.FirstVertex = ReadUint32();
+            chunk.LastVertex = ReadUint32();
+            chunk.FaceOffset = (ReadUint32()/3);
+            chunk.FaceCount = ReadUint32();
 
             uint unknown1 = ReadUint32(); // Unknown
             uint unknown2 = ReadUint32(); // Unknown
@@ -193,7 +206,10 @@ namespace JPMeshConverter {
 
             // Read texture names
             for (int j = 0; j < 9; j++) {
-                ReadString();
+                string textureName = ReadString();
+                if (j == 0) {
+                    chunk.DiffuseTexture = textureName;
+                }
             }
 
             ReadChunk(0x19); // Unknown
