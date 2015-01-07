@@ -28,11 +28,14 @@ namespace JPMeshConverter {
             }
 
             // Output the mesh data to a Wavefront OBJ
-            String outputName = fileDialog.FileName.Replace(".d3dmesh", ".obj");
-            File.WriteAllText(outputName, mesh.ToString());
+            String meshOutputName = fileDialog.FileName.Replace(".d3dmesh", ".obj");
+            String mtlOutputName = meshOutputName.Replace(".obj",".mtl");
+            String mtlName = mtlOutputName.Substring(mtlOutputName.LastIndexOf("\\")+1);
+            File.WriteAllText(meshOutputName, mesh.GetObjData(mtlName));
+            File.WriteAllText(mtlOutputName,mesh.GetMtlData());
 
             // Show the user it worked
-            MessageBox.Show(outputName+"\n\nProcessed "+mesh.Chunks.Count+" chunks.\n"+mesh.Vertices.Count + " vertices exported.", "Export successful!");
+            MessageBox.Show(meshOutputName+"\n\nProcessed "+mesh.Chunks.Count+" chunks.\n"+mesh.Vertices.Count + " vertices exported.", "Export successful!");
         }
     }
 }
