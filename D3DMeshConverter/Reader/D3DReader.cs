@@ -118,7 +118,6 @@ namespace JPMeshConverter {
             uint u2 = ReadUint32(); // Unknown
             uint u3 = ReadUint32(); // Unknown
 
-            Console.WriteLine("Face data size: "+(u1/3)+" ("+u1+")");
             // Parse triangle data
             // Triangles are specified by 3 unsigned 16 bit integers
             for (int i = 0; i < u1 / 3; i++) {
@@ -134,9 +133,23 @@ namespace JPMeshConverter {
 
             // Size of every vertex declaration
             uint vertexDataSize = ReadUint32();
+            
+            byte[] unknown1 = ReadChunk(0x28);
+            byte[] unknown2 = ReadChunk(0x3C);
+            
+            // These 2 bytes seem to decide how many times the uv.x needs to be multiplied
+            uint m1 = ReadUint32(unknown2,0xC);
+            uint m2 = ReadUint32(unknown2,0x24);
+            float xMultiplier = 1;
+            if (m2 > 0) {
+                xMultiplier = 3;
+            } else if (m1 > 0) {
+                xMultiplier = 2;
+            }
 
-            ReadChunk(0xAC); // Unknown
-            Console.WriteLine("Vertex count: "+vertexCount+" data size: "+(vertexCount*vertexDataSize));
+            byte[] unknown3 = ReadChunk(0x3C);
+            
+            ReadChunk(0xC); // zero
 
             // Parse all vertices
             for (uint j = 0; j < vertexCount; j++) {
@@ -150,7 +163,8 @@ namespace JPMeshConverter {
                 Vector3 normal = Vector3.up;
 
                 if (chunkSize >= 4) {
-                    uv = new Vector2(ReadFloat16(chunkData, 0x0), 1-ReadFloat16(chunkData,0x2));
+                    float x = ReadFloat16(chunkData, 0x0)*xMultiplier;
+                    uv = new Vector2(x, 1.0f-ReadFloat16(chunkData,0x2));
                 }
 
                 Vertex v = new Vertex() { Index = j, Position = p, UV = uv, Normal = normal };

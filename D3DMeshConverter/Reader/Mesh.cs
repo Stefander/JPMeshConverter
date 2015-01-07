@@ -12,8 +12,11 @@
  * IN THE SOFTWARE.
 */
 
+using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace JPMeshConverter {
     public class Mesh {
@@ -31,14 +34,16 @@ namespace JPMeshConverter {
         /// This method will output a Wavefront OBJ file
         /// </summary>
         /// <returns>OBJ file data</returns>
-        public string GetObjData() {
+        public string GetObjData(string mtlLibraryName) {
             StringBuilder objData = new StringBuilder();
+
+            objData.Append("mtllib " + mtlLibraryName + "\n");
 
             foreach (Vertex v in Vertices) {
                 objData.Append("v " + v.Position.X + " " + v.Position.Y + " " + v.Position.Z + "\n");
                 objData.Append("vt " + v.UV.X + " " + v.UV.Y + "\n");
-                //objData.Append("vn " + v.Normal.X + " " + v.Normal.Y + " " + v.Normal.Z + "\n");
             }
+
             foreach (MeshChunk chunk in Chunks) {
                 objData.Append("g chunk"+chunk.Index+"\n");
                 objData.Append("usemtl "+chunk.DiffuseTexture.Replace(".d3dtx","")+"\n");
@@ -66,7 +71,17 @@ namespace JPMeshConverter {
 
             foreach (string texture in textureList) {
                 mtlData.Append("newmtl "+texture+"\n");
-                mtlData.Append("Ka 1.000 1.000 1.000\nKd 1.000 1.000 1.000\nKs 0.000 0.000 0.000\nmap_d "+texture+"\n");
+                
+                // If the color is in the filename, try to parse it
+                string sPattern = "^color_[A-Fa-f0-9]{3,6}$";
+                Color diffuseColor = Color.White;
+                if (Regex.IsMatch(texture, sPattern)) {
+                    ColorConverter converter = new ColorConverter();
+                    diffuseColor = (Color)converter.ConvertFromString("#"+texture.Substring(texture.IndexOf("_") + 1));
+                }
+
+                mtlData.Append("Kd " + (diffuseColor.R / 255.0f) + " " + (diffuseColor.G / 255.0f) + " " + (diffuseColor.B / 255.0f) + "\n");
+                mtlData.Append("Ka 1.000 1.000 1.000\nKs 0.000 0.000 0.000\nmap_d " + texture + "\n");
             }
 
             return mtlData.ToString();
