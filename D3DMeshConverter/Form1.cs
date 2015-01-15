@@ -18,7 +18,7 @@ namespace JPMeshConverter {
             }
 
             // Parse the model data
-            D3DReader reader = new D3DReader(fileDialog.FileName);
+            JurassicReader reader = new JurassicReader(fileDialog.FileName);
 
             // If the model couldn't be parsed correctly, error and return
             Mesh mesh = reader.MeshData;

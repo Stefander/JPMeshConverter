@@ -53,6 +53,14 @@ namespace JPMeshConverter {
             return value;
         }
 
+        protected float ReadFloat16() {
+            return ReadFloat16(ReadChunk(2), 0);
+        }
+
+        protected float ReadFloat16(byte[] data, uint offset) {
+            return (ReadUint16(data, offset) / (float)UInt16.MaxValue) * 2;
+        }
+
         protected uint ReadUint32(byte[] data, uint offset) {
             uint value = BitConverter.ToUInt32(data, (int)offset);
             if (type == EndianType.Little) {
@@ -83,12 +91,12 @@ namespace JPMeshConverter {
             return ReadString(ReadChunk(length),0,length);
         }
 
-        protected float ReadFloat(byte[] data) {
-            return BitConverter.ToSingle(data, 0);
+        protected float ReadFloat(byte[] data, uint offset) {
+            return BitConverter.ToSingle(data, (int)offset);
         }
 
         protected float ReadFloat() {
-            return ReadFloat(ReadChunk(4));
+            return ReadFloat(ReadChunk(4),0);
         }
 
         protected Vector2 ReadVector2() {

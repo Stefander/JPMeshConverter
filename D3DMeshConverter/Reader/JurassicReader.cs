@@ -15,26 +15,52 @@
 using System;
 
 namespace JPMeshConverter {
-    public class D3DReader : ByteReader {
-        private enum ModelType {
+    public class JurassicReader : ByteReader {
+        public enum FileType {
+            Prop=0x3,
+            Language=0x4,
+            Scene=0x6,
+            Skeleton=0x7,
             StaticMesh=0xD,
             SkeletalMesh=0xE
         }
 
-        private ModelType modelType;
+        public FileType Type { get; private set; }
         public Mesh MeshData { get; private set; }
+
+        private Vector2 UVScale;
 
         /// <summary>
         /// Reads the mesh data from a file
         /// </summary>
         /// <param name="fileName">Filename</param>
         /// <returns>Mesh data</returns>
-        public D3DReader(string fileName) {
+        public JurassicReader(string fileName) {
             Open(fileName);
 
             if (!ReadHeader()) {
                 MeshData = null;
             }
+
+            // 0x8: Unknown, constant
+            ReadChunk(0x60);
+
+            // 0x68: Unknown, constant, but varies with type
+            int chunkSize = Type == FileType.StaticMesh ? 0x3C : 0x48;
+            ReadChunk((uint)chunkSize); // Unknown
+
+            // 0xB8: Model name
+            String meshName = ReadString();
+            Console.WriteLine("Mesh: " + meshName);
+
+            byte[] unknownChunk = ReadChunk(0x6); // Unknown
+
+            Vector3 pos1 = ReadVector3(); // Min AABB?
+            Vector3 pos2 = ReadVector3(); // Max AABB?
+
+            uint unknown = ReadUint32(); // 20?
+
+            unknownChunk = ReadChunk(0x14);
 
             MeshData = new Mesh();
 
@@ -44,14 +70,13 @@ namespace JPMeshConverter {
                 MeshData.Chunks.Add(chunk);
             }
 
-            uint unknown = ReadUint32(); // Unknown
-            uint unknown1 = ReadUint32(); // Unknown
+            unknownChunk = ReadChunk(0x8); // Zero
 
-            if (modelType == ModelType.SkeletalMesh) {
-                uint chunkSize = ReadUint32(); // Size of chunk
+            if (Type == FileType.SkeletalMesh) {
+                uint unknownSize = ReadUint32(); // Size of chunk
                 uint count2 = ReadUint32(); // Unknown
                 uint count3 = ReadUint32(); // Unknown
-                ReadChunk(chunkSize);
+                ReadChunk(unknownSize);
             } else {
                 // Alternating 0x8 and 0x0
                 ReadPadding(5);
@@ -72,36 +97,13 @@ namespace JPMeshConverter {
             // 0x0: Read the model identifier
             String identifier = ReadString(4);
 
-            // Make sure it's a valid model file
+            // Make sure it's a valid Telltale file
             if (!identifier.Equals("ERTM")) {
                 return false;
             }
 
             // 0x4: Model type
-            modelType = (ModelType)ReadUint32();
-            Console.WriteLine("Model type: " + modelType);
-
-            // 0x8: Unknown, constant
-            ReadChunk(0x60);
-
-            // 0x68: Unknown, constant, but varies with type
-            int unknownSize = modelType == ModelType.StaticMesh ? 0x3C : 0x48;
-            ReadChunk((uint)unknownSize); // Unknown
-
-            // 0xB8: Model name
-            String meshName = ReadString();
-            Console.WriteLine("Model: " + meshName);
-
-            ReadChunk(0x6); // Unknown
-
-            Vector3 pos1 = ReadVector3(); // Min AABB?
-            Vector3 pos2 = ReadVector3(); // Max AABB?
-
-            uint unknown = ReadUint32(); // 20?
-
-            String preStr = ToHex(ReadChunk(0xC));
-            String str = ToHex(ReadChunk(0x8));
-
+            Type = (FileType)ReadUint32();
             return true;
         }
 
@@ -134,19 +136,8 @@ namespace JPMeshConverter {
             // Size of every vertex declaration
             uint vertexDataSize = ReadUint32();
             
-            byte[] unknown1 = ReadChunk(0x28);
+            byte[] unknown1 = ReadChunk(0x28); // Constant
             byte[] unknown2 = ReadChunk(0x3C);
-            
-            // These 2 bytes seem to decide how many times the uv.x needs to be multiplied
-            uint m1 = ReadUint32(unknown2,0xC);
-            uint m2 = ReadUint32(unknown2,0x24);
-            float xMultiplier = 1;
-            if (m2 > 0) {
-                xMultiplier = 3;
-            } else if (m1 > 0) {
-                xMultiplier = 2;
-            }
-
             byte[] unknown3 = ReadChunk(0x3C);
             
             ReadChunk(0xC); // zero
@@ -161,19 +152,31 @@ namespace JPMeshConverter {
 
                 Vector2 uv = Vector2.zero;
                 Vector3 normal = Vector3.up;
+                Vector3 tangent = Vector3.up;
 
                 if (chunkSize >= 4) {
-                    float x = ReadFloat16(chunkData, 0x0)*xMultiplier;
-                    uv = new Vector2(x, 1.0f-ReadFloat16(chunkData,0x2));
+                    float x = ReadFloat16(chunkData, 0x0)*UVScale.X;
+                    float y = -ReadFloat16(chunkData, 0x2)*UVScale.Y;
+                    uv = new Vector2(x, y);
+
+                    // Not sure about the normal/tangent format, disabled for now
+                    /*if (chunkSize >= 0x14) {
+                        uint offset = chunkSize-0x10;
+                        float nx = ReadFloat16(chunkData,offset);
+                        float ny = ReadFloat16(chunkData,offset+0x2);
+                        float nz = ReadFloat16(chunkData,offset+0x4);
+                        normal = new Vector3(nx,ny,nz);
+
+                        float tx = ReadFloat16(chunkData, offset+0x6);
+                        float ty = ReadFloat16(chunkData, offset+0x8);
+                        float tz = ReadFloat16(chunkData, offset+0xA);
+                        tangent = new Vector3(tx,-ty,tz);
+                    }*/
                 }
 
                 Vertex v = new Vertex() { Index = j, Position = p, UV = uv, Normal = normal };
                 MeshData.Vertices.Add(v);
             }
-        }
-
-        private float ReadFloat16(byte[] data, uint offset) {
-            return (ReadUint16(data, offset) / (float)UInt16.MaxValue)*2;
         }
 
         /// <summary>
@@ -185,39 +188,24 @@ namespace JPMeshConverter {
             MeshChunk chunk = new MeshChunk();
             chunk.Index = index;
 
-            ReadChunk(0x24);
+            byte[] unknownChunk = ReadChunk(0x24);
+            uint unknownIndex = ReadUint32(unknownChunk,0x18);
 
             chunk.FirstVertex = ReadUint32();
             chunk.LastVertex = ReadUint32();
             chunk.FaceOffset = (ReadUint32()/3);
             chunk.FaceCount = ReadUint32();
-
-            uint unknown1 = ReadUint32(); // Unknown
-            uint unknown2 = ReadUint32(); // Unknown
-            uint unknown3 = ReadUint32(); // Unknown
-
+            
+            unknownChunk = ReadChunk(0xC);
             Vector3 unknownpos1 = ReadVector3();
             Vector3 unknownpos2 = ReadVector3();
 
-            uint const1 = ReadUint32(); // Constant: 0x14
+            unknownChunk = ReadChunk(0x18);
+            uint materialIndex = ReadUint32(unknownChunk,0x14);
 
-            uint unknown4 = ReadUint32();
-            uint unknown5 = ReadUint32();
-            uint unknown6 = ReadUint32();
-            uint unknown7 = ReadUint32();
-
-            uint materialIndex = ReadUint32();
-
-            uint unknown9 = ReadUint32();
-            uint unknown10 = ReadUint32(); // MAX_VALUE
-            uint unknown11 = ReadUint32(); // MAX_VALUE
-
-            uint unknown12 = ReadUint32();
-
-            uint unknown13 = ReadUint32(); // MAX_VALUE
-            uint unknown14 = ReadUint32(); // MAX_VALUE
-            uint unknown15 = ReadUint32(); // MAX_VALUE
-
+            unknownChunk = ReadChunk(0x1C);
+            uint unknownIndex2 = ReadUint32(unknownChunk,0xC);
+            
             // Read texture names
             for (int j = 0; j < 9; j++) {
                 string textureName = ReadString();
@@ -226,9 +214,13 @@ namespace JPMeshConverter {
                 }
             }
 
-            ReadChunk(0x19); // Unknown
-            ReadString();
-            ReadChunk(0xD9); // Unknown
+            unknownChunk = ReadChunk(0x19);
+            string reflectionMap = ReadString();
+            unknownChunk = ReadChunk(0x85);
+            string unknownTexture = ReadString();
+            unknownChunk = ReadChunk(0x2B);
+            string subsurfaceTexture = ReadString();
+            unknownChunk = ReadChunk(0x19);
 
             return chunk;
         }
@@ -240,24 +232,21 @@ namespace JPMeshConverter {
             ReadUint32(); // Zero
 
             String materialType = ReadString(4); // Unknown
-            
-            ReadChunk(0x1);
+
+            ReadChunk(0x1); // 0x01
             uint mat01 = ReadUint32(); // Unknown
             uint mat02 = ReadUint32(); // Unknown
             uint mat03 = ReadUint32(); // Unknown
 
-            // Parse the 8 file name slots
+            // Parse the 8 file name slots (0: Diffuse, 4: Normal)
             for (int i = 0; i < 8; i++) {
-                uint unknown = ReadUint32();
+                byte[] unknown = ReadChunk(4);
                 ReadFileNameBlock();
             }
 
-            uint u1 = ReadUint32(); // Unknown
-            uint u2 = ReadUint32(); // Unknown
-            uint u3 = ReadUint32(); // Unknown
-            uint u4 = ReadUint32(); // Unknown
-            uint u5 = ReadUint32(); // Unknown
-
+            byte[] footer = ReadChunk(0x14); // Unknown
+            UVScale = new Vector2(ReadFloat(footer,0xE),1);
+            
             ReadPadding(5); // Constant 0x3F80, end with 0x83F80
         }
 
@@ -267,11 +256,10 @@ namespace JPMeshConverter {
         private void ReadFileNameBlock() {
             // Read the texture count
             uint textureCount = ReadUint32();
-
             // Read all texture entries
             for (int i = 0; i < textureCount; i++) {
                 String textureName = ReadString();
-                ReadChunk(0x32); // Unknown
+                byte[] unknownBytes = ReadChunk(0x32); // Unknown
             }
         }
 

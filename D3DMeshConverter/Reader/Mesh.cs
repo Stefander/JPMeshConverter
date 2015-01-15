@@ -42,6 +42,7 @@ namespace JPMeshConverter {
             foreach (Vertex v in Vertices) {
                 objData.Append("v " + v.Position.X + " " + v.Position.Y + " " + v.Position.Z + "\n");
                 objData.Append("vt " + v.UV.X + " " + v.UV.Y + "\n");
+                //objData.Append("vn " + v.Normal.X + " " + v.Normal.Y + " " + v.Normal.Z + "\n");
             }
 
             foreach (MeshChunk chunk in Chunks) {
@@ -52,6 +53,7 @@ namespace JPMeshConverter {
                     uint v1 = t.V1 + 1;
                     uint v2 = t.V2 + 1;
                     uint v3 = t.V3 + 1;
+                    //objData.Append("f " + v1 + "/" + v1 + "/" + v1 + " " + v2 + "/" + v2 + "/" + v2 + " " + v3 + "/" + v3 + "/" + v3 + "\n");
                     objData.Append("f " + v1 + "/" + v1 + " " + v2 + "/" + v2 + " " + v3 + "/" + v3 + "\n");
                 }
             }
