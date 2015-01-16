@@ -35,7 +35,7 @@
             this.convertButton.Name = "convertButton";
             this.convertButton.Size = new System.Drawing.Size(75, 23);
             this.convertButton.TabIndex = 0;
-            this.convertButton.Text = "Convert";
+            this.convertButton.Text = "Open";
             this.convertButton.UseVisualStyleBackColor = true;
             this.convertButton.Click += new System.EventHandler(this.OnConvert);
             // 
@@ -64,7 +64,7 @@
             this.Name = "Form1";
             this.Opacity = 0.9D;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "JP: The Game Model Extractor";
+            this.Text = "JP: The Game Asset Reader";
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
             this.ResumeLayout(false);
 

@@ -21,9 +21,9 @@ namespace JPMeshConverter {
             JurassicReader reader = new JurassicReader(fileDialog.FileName);
 
             // If the model couldn't be parsed correctly, error and return
-            Mesh mesh = reader.MeshData;
-            if (reader.MeshData == null) {
-                MessageBox.Show("ERROR: Model could not be parsed.","Export failed!");
+            Mesh mesh = reader.mesh;
+            if (mesh == null) {
+                MessageBox.Show("ERROR: "+reader.Type+" file encountered an error while parsing!","Export failed!");
                 return;
             }
 

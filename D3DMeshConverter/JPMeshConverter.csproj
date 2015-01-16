@@ -57,13 +57,16 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Reader\ByteReader.cs" />
-    <Compile Include="Reader\D3DReader.cs" />
     <Compile Include="Form1.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Form1.Designer.cs">
       <DependentUpon>Form1.cs</DependentUpon>
     </Compile>
+    <Compile Include="Reader\BaseReader.cs" />
+    <Compile Include="Reader\D3DReader.cs" />
+    <Compile Include="Reader\JurassicReader.cs" />
+    <Compile Include="Reader\LanguageReader.cs" />
     <Compile Include="Reader\Mesh.cs" />
     <Compile Include="Helpers\ModelFileDialog.cs" />
     <Compile Include="Program.cs" />

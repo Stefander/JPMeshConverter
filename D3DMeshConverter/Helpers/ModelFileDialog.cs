@@ -24,8 +24,8 @@ namespace JPMeshConverter {
             FileName = "";
             _dialog = new OpenFileDialog();
             _dialog.InitialDirectory = initialDirectory;
-            _dialog.Title = "Open JP mesh file";
-            _dialog.Filter = "D3DMesh models (*.d3dmesh)|*.d3dmesh|All files (*.*)|*.*";
+            _dialog.Title = "Open JP Resource";
+            _dialog.Filter = "D3D Mesh (*.d3dmesh)|*.d3dmesh|All files (*.*)|*.*";
             _dialog.FilterIndex = 0;
             _dialog.RestoreDirectory = true;
         }
