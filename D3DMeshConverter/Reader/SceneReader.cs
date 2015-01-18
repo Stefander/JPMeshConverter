@@ -15,6 +15,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Windows.Forms;
 
 namespace JPAssetReader {
     class SceneReader : BaseReader, IMeshReader {
@@ -37,6 +38,12 @@ namespace JPAssetReader {
 
         public override bool Read(uint subType, FileStream stream) {
             base.Read(subType, stream);
+
+            if (subType != 0x6) {
+                MessageBox.Show("Subtype "+ToHex(subType)+" not supported!");
+                return false;
+            }
+
             ReadChunk(0x49);
 
             // Read the scene name

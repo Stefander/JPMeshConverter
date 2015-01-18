@@ -24,6 +24,11 @@ namespace JPAssetReader {
         public override bool Read(uint subType, FileStream stream) {
             base.Read(subType, stream);
 
+            if(subType != 0xD && subType != 0xE) {
+                MessageBox.Show("Subtype "+subType+" not supported!");
+                return false;
+            }
+
             ReadHeader();
 
             mesh = new Mesh();

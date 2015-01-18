@@ -121,7 +121,8 @@ namespace JPAssetReader {
 
                 RuleFile = ReadString(false);
             } else {
-                Console.WriteLine(_stream.Name+": Subtype "+subType+" not supported!");
+                MessageBox.Show(_stream.Name+": Subtype "+subType+" not supported!");
+                return false;
             }
 
             return true;
