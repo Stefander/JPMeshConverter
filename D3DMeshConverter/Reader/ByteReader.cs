@@ -16,7 +16,7 @@ using System;
 using System.IO;
 using System.Text;
 
-namespace JPMeshConverter {
+namespace JPAssetReader {
     public enum EndianType {
         Little = 0,
         Big
@@ -99,12 +99,28 @@ namespace JPMeshConverter {
             return ReadFloat(ReadChunk(4),0);
         }
 
+        protected Vector2 ReadVector2(byte[] data, uint offset) {
+            return new Vector2(ReadFloat(data,offset),ReadFloat(data,offset+0x4));
+        }
+
         protected Vector2 ReadVector2() {
-            return new Vector2(ReadFloat(),ReadFloat());
+            return ReadVector2(ReadChunk(0x8),0);
+        }
+
+        protected Vector3 ReadVector3(byte[] data, uint offset) {
+            return new Vector3(ReadFloat(data, offset), ReadFloat(data, offset + 0x4), ReadFloat(data, offset+0x8));
         }
 
         protected Vector3 ReadVector3() {
-            return new Vector3(ReadFloat(),ReadFloat(),ReadFloat());
+            return ReadVector3(ReadChunk(0xC),0);
+        }
+
+        protected Quaternion ReadQuaternion(byte[] data, uint offset) {
+            return new Quaternion(ReadFloat(data,offset), ReadFloat(data, offset+0x4), ReadFloat(data, offset+0x8), ReadFloat(data, offset+0xC));
+        }
+
+        protected Quaternion ReadQuaternion() {
+            return ReadQuaternion(ReadChunk(0x10),0);
         }
 
         protected uint ReadUint32() {
@@ -124,8 +140,8 @@ namespace JPMeshConverter {
             return Encoding.UTF8.GetString(data, (int)offset, (int)length).Trim(removeChars);
         }
 
-        public String ToHex(byte[] array) {
-            return BitConverter.ToString(array);
+        public String ToHex(byte[] array, uint offset=0, int length=-1) {
+            return BitConverter.ToString(array,(int)offset,(length == -1 ? array.Length-(int)offset : length));
         }
 
         public String ToHex(uint data) {

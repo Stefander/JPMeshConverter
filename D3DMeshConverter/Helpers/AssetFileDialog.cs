@@ -15,17 +15,17 @@
 using System;
 using System.Windows.Forms;
 
-namespace JPMeshConverter {
-    public class ModelFileDialog {
+namespace JPAssetReader {
+    public class AssetFileDialog {
         private OpenFileDialog _dialog = null;
         public String FileName { get; private set; }
 
-        public ModelFileDialog(String initialDirectory) {
+        public AssetFileDialog(String initialDirectory) {
             FileName = "";
             _dialog = new OpenFileDialog();
             _dialog.InitialDirectory = initialDirectory;
             _dialog.Title = "Open JP Resource";
-            _dialog.Filter = "D3D Mesh (*.d3dmesh)|*.d3dmesh|All files (*.*)|*.*";
+            _dialog.Filter = "JP Resource Files|*.d3dmesh;*.lang;*.prop;*.scene;*.skl|D3D Mesh|*.d3dmesh|Localization|*.lang|All files (*.*)|*.*";
             _dialog.FilterIndex = 0;
             _dialog.RestoreDirectory = true;
         }

@@ -12,13 +12,12 @@
  * IN THE SOFTWARE.
 */
 
-using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace JPMeshConverter {
+namespace JPAssetReader {
     public class Mesh {
         public List<Vertex> Vertices;
         public List<Triangle> Triangles;
@@ -28,6 +27,42 @@ namespace JPMeshConverter {
             Vertices = new List<Vertex>();
             Triangles = new List<Triangle>();
             Chunks = new List<MeshChunk>();
+        }
+
+        public void Transform(Transform t) {
+            Matrix m = Matrix.identity;
+            m.Translate(t.Position);
+            m.Scale(t.Scale);
+
+            foreach (Vertex v in Vertices) {
+                v.Position = m * v.Position;
+            }
+        }
+
+        public void Combine(Mesh other) {
+            uint vertexOffset = (uint)Vertices.Count;
+            uint triangleOffset = (uint)Triangles.Count;
+            uint chunkOffset = (uint)Chunks.Count;
+
+            foreach (Vertex v in other.Vertices) {
+                Vertices.Add(v);
+            }
+
+            foreach (Triangle t in other.Triangles) {
+                Triangle triangle = new Triangle() { V1 = t.V1 + vertexOffset, V2 = t.V2 + vertexOffset, V3 = t.V3 + vertexOffset };
+                Triangles.Add(triangle);
+            }
+
+            foreach (MeshChunk c in other.Chunks) {
+                MeshChunk chunk = new MeshChunk();
+                chunk.DiffuseTexture = c.DiffuseTexture;
+                chunk.FaceCount = c.FaceCount;
+                chunk.FaceOffset = c.FaceOffset + triangleOffset;
+                chunk.FirstVertex = c.FirstVertex + triangleOffset;
+                chunk.LastVertex = c.LastVertex + triangleOffset;
+                chunk.Index = c.Index + chunkOffset;
+                Chunks.Add(chunk);
+            }
         }
 
         /// <summary>
@@ -46,8 +81,8 @@ namespace JPMeshConverter {
             }
 
             foreach (MeshChunk chunk in Chunks) {
-                objData.Append("g chunk"+chunk.Index+"\n");
-                objData.Append("usemtl "+chunk.DiffuseTexture.Replace(".d3dtx","")+"\n");
+                objData.Append("g chunk" + chunk.Index + "\n");
+                objData.Append("usemtl " + chunk.DiffuseTexture.Replace(".d3dtx", "") + "\n");
                 for (uint i = chunk.FaceOffset; i < chunk.FaceOffset + chunk.FaceCount; i++) {
                     Triangle t = Triangles[(int)i];
                     uint v1 = t.V1 + 1;
@@ -65,21 +100,21 @@ namespace JPMeshConverter {
             StringBuilder mtlData = new StringBuilder();
             List<string> textureList = new List<string>();
             foreach (MeshChunk chunk in Chunks) {
-                string diffuseName = chunk.DiffuseTexture.Replace(".d3dtx","");
+                string diffuseName = chunk.DiffuseTexture.Replace(".d3dtx", "");
                 if (textureList.IndexOf(diffuseName) == -1) {
                     textureList.Add(diffuseName);
                 }
             }
 
             foreach (string texture in textureList) {
-                mtlData.Append("newmtl "+texture+"\n");
-                
+                mtlData.Append("newmtl " + texture + "\n");
+
                 // If the color is in the filename, try to parse it
                 string sPattern = "^color_[A-Fa-f0-9]{3,6}$";
                 Color diffuseColor = Color.White;
                 if (Regex.IsMatch(texture, sPattern)) {
                     ColorConverter converter = new ColorConverter();
-                    diffuseColor = (Color)converter.ConvertFromString("#"+texture.Substring(texture.IndexOf("_") + 1));
+                    diffuseColor = (Color)converter.ConvertFromString("#" + texture.Substring(texture.IndexOf("_") + 1));
                 }
 
                 mtlData.Append("Kd " + (diffuseColor.R / 255.0f) + " " + (diffuseColor.G / 255.0f) + " " + (diffuseColor.B / 255.0f) + "\n");
@@ -122,50 +157,11 @@ namespace JPMeshConverter {
     }
 
     /// <summary>
-    /// Vector2 class
+    /// Transform class
     /// </summary>
-    public class Vector2 {
-        public float X;
-        public float Y;
-        
-        public Vector2(float x, float y) {
-            X = x;
-            Y = y;
-        }
-
-        public static Vector2 zero {
-            get {
-                return new Vector2(0,0);
-            }
-        }
-
-        public override string ToString() {
-            return "(" + X + "," + Y + ")";
-        }
-    }
-
-    /// <summary>
-    /// Vector3 class
-    /// </summary>
-    public class Vector3 {
-        public float X = 0;
-        public float Y = 0;
-        public float Z = 0;
-
-        public Vector3(float x, float y, float z) {
-            X = x;
-            Y = y;
-            Z = z;
-        }
-
-        public static Vector3 up {
-            get {
-                return new Vector3(0,0.5f,0);
-            }
-        }
-
-        public override string ToString() {
-            return "(" + X + "," + Y + "," + Z + ")";
-        }
+    public class Transform {
+        public Vector3 Position = Vector3.zero;
+        public Quaternion Rotation = Quaternion.identity;
+        public Vector3 Scale = Vector3.one;
     }
 }

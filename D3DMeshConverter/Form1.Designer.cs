@@ -1,4 +1,4 @@
-﻿namespace JPMeshConverter {
+﻿namespace JPAssetReader {
     partial class Form1 {
         /// <summary>
         /// Required designer variable.
@@ -31,7 +31,7 @@
             // 
             // convertButton
             // 
-            this.convertButton.Location = new System.Drawing.Point(136, 248);
+            this.convertButton.Location = new System.Drawing.Point(12, 248);
             this.convertButton.Name = "convertButton";
             this.convertButton.Size = new System.Drawing.Size(75, 23);
             this.convertButton.TabIndex = 0;

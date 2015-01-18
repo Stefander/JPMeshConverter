@@ -12,41 +12,14 @@
  * IN THE SOFTWARE.
 */
 
-using System.Collections.Generic;
-using System.IO;
-
 namespace JPAssetReader {
-    public struct LanguageEntry {
-        public string Name;
-        public string Text;
-    }
-
-    public class LanguageReader : BaseReader {
-        public List<LanguageEntry> entries;
-
-        public override bool Read(uint subType, FileStream stream) {
-            base.Read(subType, stream);
-
-            entries = new List<LanguageEntry>();
-            byte[] header = ReadChunk(0x4C);
-            
-            uint entryCount = ReadUint32();
-            for (int i = 0; i < entryCount; i++) {
-                entries.Add(ReadLanguageString());
-            }
-
-            byte[] footer = ReadChunk(0x24);
-            uint unknown = ReadUint32(footer,0x4);
-            
-            return true;
+    public static class Common {
+        public static string GetExtension(string str) {
+            return str.Substring(str.LastIndexOf(".")+1);
         }
 
-        private LanguageEntry ReadLanguageString() {
-            string name = ReadString();
-            string content = ReadString();
-            uint u1 = ReadUint32();
-            uint u2 = ReadUint32();
-            return new LanguageEntry() { Name = name, Text = content };
+        public static string GetPath(string file) {
+            return file.Substring(0, file.LastIndexOf("\\"));
         }
     }
 }

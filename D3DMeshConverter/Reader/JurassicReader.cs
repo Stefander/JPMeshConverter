@@ -13,66 +13,73 @@
 */
 
 using System;
-using System.Windows.Forms;
 
-namespace JPMeshConverter {
+namespace JPAssetReader {
     public class JurassicReader : BaseReader {
-        private BaseReader reader = null;
-        public Mesh mesh { get { if (Type == FileType.SkeletalMesh || Type == FileType.StaticMesh) { return (reader as D3DReader).MeshData; } return null; } }
+        public BaseReader reader { get; private set; }
+        public Mesh mesh { get { if (reader is IMeshReader) { return (reader as IMeshReader).GetMesh(); } return null; } }
 
         /// <summary>
         /// Reads the mesh data from a file
         /// </summary>
         /// <param name="fileName">Filename</param>
         /// <returns>Mesh data</returns>
-        public JurassicReader(string fileName) {
+        public bool Read(string fileName) {
             // Open a new filestream
             Open(fileName);
-
-            // Decide which reader to use, or show an error when failed
-            bool success = ReadHeader(out Type);
             
-            if (success && (reader = PickReader(Type)) != null) {
-                reader.Read(_stream);
+            // Decide which reader to use, or show an error when failed
+            bool success = ReadHeader();
+
+            if (success && SetReader()) {
+                success = reader.Read(SubType, _stream);
             }
 
             // Close the stream
             Close();
-        }
 
+            return success;
+        }
+        
         /// <summary>
         /// This method decides which reader is going to be used
         /// </summary>
         /// <param name="type">File type</param>
         /// <returns>The appropriate reader</returns>
-        private BaseReader PickReader(FileType type) {
-            BaseReader outReader = null;
+        private bool SetReader() {
+            string extension = Common.GetExtension(_stream.Name);
 
-            if (type == FileType.StaticMesh || type == FileType.SkeletalMesh) {
-                outReader = new D3DReader(type);
-            } else if (type == FileType.Language) {
-                outReader = new LanguageReader();
+            if (extension.Equals("d3dmesh")) {
+                reader = new D3DReader();
+            } else if (extension.Equals("lang")) {
+                reader = new LanguageReader();
+            } else if (extension.Equals("prop")) {
+                reader = new PropReader();
+            } else if (extension.Equals("scene")) {
+                reader = new SceneReader();
+            } else {
+                return false;
             }
 
-            return outReader;
+            return true;
         }
 
         /// <summary>
         /// Reads the model header
         /// </summary>
         /// <returns>True when successful, false when failed</returns>
-        private bool ReadHeader(out FileType type) {
+        private bool ReadHeader() {
             // 0x0: Read the model identifier
             String identifier = ReadString(4);
 
             // Make sure it's a valid Telltale file
             if (!identifier.Equals("ERTM")) {
-                type = FileType.Unknown;
+                SubType = 0;
                 return false;
             }
 
             // 0x4: Model type
-            type = (FileType)ReadUint32();
+            SubType = ReadUint32();
             return true;
         }
     }

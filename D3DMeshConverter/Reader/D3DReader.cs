@@ -1,53 +1,42 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿/*
+ * Copyright (c) 2015 Stefan Wijnker
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), 
+ * to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, 
+ * and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS 
+ * IN THE SOFTWARE.
+*/
 
-namespace JPMeshConverter {
-    class D3DReader : BaseReader {
-        public Mesh MeshData { get; private set; }
+using System;
+using System.IO;
+using System.Windows.Forms;
+
+namespace JPAssetReader {
+    class D3DReader : BaseReader, IMeshReader {
+        private Mesh mesh;
         private Vector2 UVScale;
 
-        public D3DReader(FileType type) {
-            Type = type;
-        }
+        public override bool Read(uint subType, FileStream stream) {
+            base.Read(subType, stream);
 
-        public override void Read(FileStream stream) {
-            base.Read(stream);
+            ReadHeader();
 
-            // 0x8: Unknown, constant
-            ReadChunk(0x60);
-
-            // 0x68: Unknown, constant, but varies with type
-            int chunkSize = Type == FileType.StaticMesh ? 0x3C : 0x48;
-            ReadChunk((uint)chunkSize); // Unknown
-
-            // 0xB8: Model name
-            String meshName = ReadString();
-            Console.WriteLine("Mesh: " + meshName);
-
-            byte[] unknownChunk = ReadChunk(0x6); // Unknown
-
-            Vector3 pos1 = ReadVector3(); // Min AABB?
-            Vector3 pos2 = ReadVector3(); // Max AABB?
-
-            uint unknown = ReadUint32(); // 20?
-
-            unknownChunk = ReadChunk(0x14);
-
-            MeshData = new Mesh();
+            mesh = new Mesh();
 
             uint chunkCount = ReadUint32();
             for (uint i = 0; i < chunkCount; i++) {
                 MeshChunk chunk = ReadMeshChunk(i);
-                MeshData.Chunks.Add(chunk);
+                mesh.Chunks.Add(chunk);
             }
 
-            unknownChunk = ReadChunk(0x8); // Zero
+            byte[] unknownChunk = ReadChunk(0x8); // Zero
 
-            if (Type == FileType.SkeletalMesh) {
+            if (SubType == 0xE) {
                 uint unknownSize = ReadUint32(); // Size of chunk
                 uint count2 = ReadUint32(); // Unknown
                 uint count3 = ReadUint32(); // Unknown
@@ -60,6 +49,33 @@ namespace JPMeshConverter {
 
             ReadMaterial();
             ParseMeshData();
+
+            return true;
+        }
+
+        public Mesh GetMesh() {
+            return mesh;
+        }
+
+        private void ReadHeader() {
+            // 0x8: Unknown, constant
+            ReadChunk(0x60);
+
+            // 0x68: Unknown, constant, but varies with type
+            int chunkSize = SubType == 0xE ? 0x48 : 0x3C;
+            ReadChunk((uint)chunkSize); // Unknown
+
+            // 0xB8: Model name
+            String meshName = ReadString();
+
+            byte[] unknownChunk = ReadChunk(0x6); // Unknown
+
+            Vector3 pos1 = ReadVector3(); // Min AABB?
+            Vector3 pos2 = ReadVector3(); // Max AABB?
+
+            uint unknown = ReadUint32(); // 20?
+
+            unknownChunk = ReadChunk(0x14);
         }
 
         /// <summary>
@@ -82,7 +98,7 @@ namespace JPMeshConverter {
                 uint v2 = ReadUint16();
                 uint v3 = ReadUint16();
                 Triangle f = new Triangle() { V1 = v1, V2 = v2, V3 = v3 };
-                MeshData.Triangles.Add(f);
+                mesh.Triangles.Add(f);
             }
 
             // Amount of vertices
@@ -130,7 +146,7 @@ namespace JPMeshConverter {
                 }
 
                 Vertex v = new Vertex() { Index = j, Position = p, UV = uv, Normal = normal };
-                MeshData.Vertices.Add(v);
+                mesh.Vertices.Add(v);
             }
         }
 
@@ -196,13 +212,11 @@ namespace JPMeshConverter {
             // Parse the 8 file name slots (0: Diffuse, 4: Normal)
             for (int i = 0; i < 8; i++) {
                 byte[] unknown = ReadChunk(4);
-                ReadFileNameBlock();
+                ReadFileNameBlock(0x32);
             }
 
-            byte[] footer = ReadChunk(0x14); // Unknown
-            UVScale = new Vector2(ReadFloat(footer, 0xE), 1);
-
-            ReadPadding(5); // Constant 0x3F80, end with 0x83F80
+            byte[] footer = ReadChunk(0x28); // Unknown
+            UVScale = new Vector2(ReadFloat(footer, 0xE), ReadFloat(footer, 0x12));
         }
     }
 }
