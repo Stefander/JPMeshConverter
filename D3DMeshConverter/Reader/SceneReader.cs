@@ -19,7 +19,7 @@ using System.Windows.Forms;
 
 namespace JPAssetReader {
     class SceneReader : BaseReader, IMeshReader {
-        public struct SceneObject {
+        public class SceneObject {
             public string Name;
             public List<FileEntry> Dependencies;
             public Transform Transform;
@@ -73,63 +73,26 @@ namespace JPAssetReader {
             uint objectCount = ReadUint32();
             uint i = 0;
 
+            List<SceneObject> objectList = new List<SceneObject>();
             for (i=0; i < objectCount; i++) {
                 SceneObject sceneObject = ReadObject();
-                Objects.Add(sceneObject);
+
+                if (sceneObject.Group != null && sceneObject.Group.Length > 0) {
+                    SceneObject parent = objectList.Find(obj => obj.Name.Equals(sceneObject.Group));
+
+                    if (parent == null) {
+                        Console.WriteLine("Couldn't find parent object '"+sceneObject.Group+"'!");
+                        continue; }
+
+                    parent.children.Add(sceneObject);
+                } else {
+                    Objects.Add(sceneObject);
+                }
+
+                objectList.Add(sceneObject);
             }
 
             return true;
-        }
-
-        public Mesh GetMesh() {
-            Mesh m = null;
-            string path = Common.GetPath(_stream.Name);
-            Console.WriteLine(path);
-
-            foreach (SceneObject obj in Objects) {
-                for (int i = 0; i < obj.Dependencies.Count; i++) {
-                    FileEntry file = obj.Dependencies[i];
-                    string propPath = path+"\\"+file.Name;
-                    //Console.WriteLine(obj.Name+": "+obj.Group);
-
-                    // Only load it when the prop file actually exists
-                    if(File.Exists(propPath)) {
-                        // Only load prop files
-                        if (Common.GetExtension(file.Name).Equals("prop")) {
-                            JurassicReader r = new JurassicReader();
-                            if (r.Read(propPath)) {
-                                List<PropReader.DependencyEntry> dependencies = (r.reader as PropReader).Dependencies;
-                                foreach (PropReader.DependencyEntry dependency in dependencies) {
-                                    foreach (string entry in dependency.Files) {
-                                        // Only load from d3dmeshes
-                                        if (Common.GetExtension(entry).Equals("d3dmesh")) {
-                                            string meshPath = path+"\\"+entry;
-                                            if (File.Exists(meshPath)) {
-                                                JurassicReader modelReader = new JurassicReader();
-                                                if (modelReader.Read(meshPath)) {
-                                                    Mesh propMesh = modelReader.mesh;
-                                                    propMesh.Transform(obj.Transform);
-                                                    if (m == null) {
-                                                        m = propMesh;
-                                                    } else {
-                                                        m.Combine(propMesh);
-                                                    }
-                                                }
-                                            } else {
-                                                Console.WriteLine(entry+" does not exist - skipping");
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        Console.WriteLine(file.Name+" does not exist - skipping");
-                    }
-                }
-            }
-
-            return m;
         }
 
         private SceneObject ReadObject() {
@@ -167,8 +130,6 @@ namespace JPAssetReader {
             // Read transform data
             Transform transform = new Transform();
             if (obj.Type == SceneObjectType.Group) {
-                //Console.WriteLine(obj.Name+" "+ReadVector3(dataChunk,0+offset));
-                
                 Vector2 u19 = ReadVector2(dataChunk, 0x4F + offset); // Unknown
                 Vector3 u20 = ReadVector3(dataChunk, 0x5B + offset); // Unknown (valid v3)
                 Vector3 u21 = ReadVector3(dataChunk, 0x68 + offset); // Unknown
@@ -195,10 +156,98 @@ namespace JPAssetReader {
                 obj.Group = ReadString(dataChunk, 0xC7 + offset, false);
             }
 
-            Console.WriteLine(obj.Name + ": "+transform.Position+" "+ obj.Group);
             obj.Transform = transform;
 
             return obj;
+        }
+
+        private Mesh StripMesh(string path, string propName, string objectName) {
+            Mesh mesh = null;
+            JurassicReader r = new JurassicReader();
+            if (r.Read(path + "\\" + propName)) {
+                List<PropReader.DependencyEntry> dependencies = (r.reader as PropReader).Dependencies;
+                foreach (PropReader.DependencyEntry dependency in dependencies) {
+                    foreach (string entry in dependency.Files) {
+                        // Only load d3dmeshes, for now :)
+                        if (Common.GetExtension(entry).Equals("d3dmesh")) {
+                            string meshPath = path + "\\" + entry;
+                            if (!File.Exists(meshPath)) {
+                                Console.WriteLine(entry + " does not exist - skipping");
+                                continue;
+                            }
+
+                            JurassicReader modelReader = new JurassicReader();
+                            if (modelReader.Read(meshPath)) {
+                                Mesh propMesh = modelReader.mesh;
+                                if (mesh == null) {
+                                    mesh = propMesh;
+                                }
+                                else {
+                                    mesh.Combine(propMesh,objectName);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return mesh;
+        }
+
+        private Mesh ConstructMesh(SceneObject obj, Matrix matrix) {
+            Mesh mesh = null;
+            matrix.Translate(obj.Transform.Position);
+            matrix.Scale(obj.Transform.Scale);
+            matrix.Rotate(obj.Transform.Rotation);
+
+            string path = Common.GetPath(_stream.Name);
+
+            for (int i = 0; i < obj.Dependencies.Count; i++) {
+                FileEntry file = obj.Dependencies[i];
+                string propPath = path + "\\" + file.Name;
+                if (Common.GetExtension(file.Name).Equals("prop")) {
+                    if (File.Exists(propPath)) {
+                        mesh = StripMesh(path, file.Name, obj.Name);
+                    } else {
+                        Console.WriteLine(file.Name + " does not exist - skipping");
+                    }
+                }
+            }
+
+            // Transform the mesh before adding the children
+            if (mesh != null) {
+                mesh.Transform(matrix);
+            }
+
+            foreach (SceneObject sceneObject in obj.children) {
+                Mesh childMesh = ConstructMesh(sceneObject, matrix);
+
+                if (childMesh != null) {
+                    if (mesh == null) {
+                        mesh = childMesh;
+                    }
+                    else {
+                        mesh.Combine(childMesh,sceneObject.Name);
+                    }
+                }
+            }
+
+            return mesh;
+        }
+
+        public Mesh GetMesh() {
+            Mesh m = null;
+            foreach (SceneObject obj in Objects) {
+                Mesh propMesh = ConstructMesh(obj, Matrix.identity);
+
+                if (m == null) {
+                    m = propMesh;
+                } else {
+                    m.Combine(propMesh, obj.Name);
+                }
+            }
+
+            return m;
         }
     }
 }

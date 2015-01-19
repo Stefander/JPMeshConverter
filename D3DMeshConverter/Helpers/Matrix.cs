@@ -15,7 +15,7 @@
 using System;
 
 namespace JPAssetReader {
-    public class Matrix {
+    public struct Matrix {
         float m00, m01, m02, m03;
         float m10, m11, m12, m13;
         float m20, m21, m22, m23;
@@ -84,9 +84,30 @@ namespace JPAssetReader {
             m22 *= scale.Z;
         }
 
-        public void Transform(Vector3 position, Vector3 scale) {
-	        Translate(position);
-            Scale(scale);
+        public void Rotate(Quaternion q) {
+            q.Normalize();
+            Matrix r = new Matrix();
+            r.m00 = 1.0f - 2.0f * q.Y * q.Y - 2.0f * q.Z * q.Z;
+            r.m01 = 2.0f * q.X * q.Y - 2.0f * q.Z * q.W;
+            r.m02 = 2.0f * q.X * q.Z + 2.0f * q.Y * q.W;
+            r.m03 = 0.0f;
+
+            r.m10 = 2.0f * q.X * q.Y + 2.0f * q.Z * q.W;
+            r.m11 = 1.0f - 2.0f * q.X * q.X - 2.0f * q.Z * q.Z;
+            r.m12 = 2.0f * q.Y * q.Z - 2.0f * q.X * q.W;
+            r.m13 = 0.0f;
+
+            r.m20 = 2.0f * q.X * q.Z - 2.0f * q.Y * q.W;
+            r.m21 = 2.0f * q.Y * q.Z + 2.0f * q.X * q.W;
+            r.m22 = 1.0f - 2.0f * q.X * q.X - 2.0f * q.Y * q.Y;
+            r.m23 = 0.0f;
+
+            r.m30 = 0.0f;
+            r.m31 = 0.0f;
+            r.m32 = 0.0f;
+            r.m33 = 1.0f;
+
+            this *= r;
         }
 
         public static Vector3 operator *(Matrix m, Vector3 v) {
@@ -97,11 +118,11 @@ namespace JPAssetReader {
     /// <summary>
     /// Quaternion class
     /// </summary>
-    public class Quaternion {
-        public float X = 0;
-        public float Y = 0;
-        public float Z = 0;
-        public float W = 0;
+    public struct Quaternion {
+        public float X;
+        public float Y;
+        public float Z;
+        public float W;
 
         public Quaternion(float x, float y, float z, float w) {
             X = x;
@@ -120,6 +141,10 @@ namespace JPAssetReader {
             Y *= n;
             Z *= n;
             W *= n;
+        }
+
+        public override string ToString() {
+            return "(" + X + ", " + Y + ", " + Z + ", " + W + " )";
         }
     }
 

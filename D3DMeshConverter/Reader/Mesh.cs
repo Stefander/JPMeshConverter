@@ -29,17 +29,19 @@ namespace JPAssetReader {
             Chunks = new List<MeshChunk>();
         }
 
-        public void Transform(Transform t) {
-            Matrix m = Matrix.identity;
-            m.Translate(t.Position);
-            m.Scale(t.Scale);
-
+        public void Transform(Matrix m) {
             foreach (Vertex v in Vertices) {
                 v.Position = m * v.Position;
             }
         }
 
-        public void Combine(Mesh other) {
+        public void SetName(string name) {
+            foreach (MeshChunk chunk in Chunks) {
+                chunk.Name = name;
+            }
+        }
+
+        public void Combine(Mesh other, string objectName) {
             uint vertexOffset = (uint)Vertices.Count;
             uint triangleOffset = (uint)Triangles.Count;
             uint chunkOffset = (uint)Chunks.Count;
@@ -55,6 +57,7 @@ namespace JPAssetReader {
 
             foreach (MeshChunk c in other.Chunks) {
                 MeshChunk chunk = new MeshChunk();
+                chunk.Name = objectName;
                 chunk.DiffuseTexture = c.DiffuseTexture;
                 chunk.FaceCount = c.FaceCount;
                 chunk.FaceOffset = c.FaceOffset + triangleOffset;
@@ -81,7 +84,8 @@ namespace JPAssetReader {
             }
 
             foreach (MeshChunk chunk in Chunks) {
-                objData.Append("g chunk" + chunk.Index + "\n");
+                string chunkName = chunk.Name == null ? "chunk" : chunk.Name;
+                objData.Append("g " + chunk.Name + chunk.Index + "\n");
                 objData.Append("usemtl " + chunk.DiffuseTexture.Replace(".d3dtx", "") + "\n");
                 for (uint i = chunk.FaceOffset; i < chunk.FaceOffset + chunk.FaceCount; i++) {
                     Triangle t = Triangles[(int)i];
@@ -129,6 +133,7 @@ namespace JPAssetReader {
     /// Mesh chunk class
     /// </summary>
     public class MeshChunk {
+        public string Name;
         public uint Index;
         public uint FirstVertex;
         public uint LastVertex;
