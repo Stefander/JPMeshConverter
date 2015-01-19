@@ -25,6 +25,7 @@ namespace JPAssetReader {
             public Transform Transform;
             public string Group;
             public SceneObjectType Type;
+            public List<SceneObject> children = new List<SceneObject>();
         }
 
         public enum SceneObjectType {
@@ -89,6 +90,7 @@ namespace JPAssetReader {
                 for (int i = 0; i < obj.Dependencies.Count; i++) {
                     FileEntry file = obj.Dependencies[i];
                     string propPath = path+"\\"+file.Name;
+                    //Console.WriteLine(obj.Name+": "+obj.Group);
 
                     // Only load it when the prop file actually exists
                     if(File.Exists(propPath)) {
@@ -165,10 +167,24 @@ namespace JPAssetReader {
             // Read transform data
             Transform transform = new Transform();
             if (obj.Type == SceneObjectType.Group) {
+                //Console.WriteLine(obj.Name+" "+ReadVector3(dataChunk,0+offset));
+                
                 Vector2 u19 = ReadVector2(dataChunk, 0x4F + offset); // Unknown
-                Vector3 u20 = ReadVector3(dataChunk, 0x5B + offset); // Position?
+                Vector3 u20 = ReadVector3(dataChunk, 0x5B + offset); // Unknown (valid v3)
                 Vector3 u21 = ReadVector3(dataChunk, 0x68 + offset); // Unknown
                 uint u22 = ReadUint32(dataChunk, 0x73 + offset);
+                uint cOffset = 0x77;
+                uint currentOffset = (uint)(_stream.Position-dataChunk.Length)+(offset+cOffset);
+                uint currentLength = (uint)(dataChunk.Length - (offset + cOffset));
+                if (u22 == 0) {
+                    Vector3 u23 = ReadVector3(dataChunk,0x87+offset); // Unknown
+                    transform.Position = ReadVector3(dataChunk, 0xB7 + offset); // Position?
+                    obj.Group = ReadString(dataChunk,0x10B+offset,false);
+                } else {
+                    obj.Group = ReadString(dataChunk, 0xAF + offset, false);
+                    //Console.WriteLine(obj.Name + " " + ToHex(currentOffset) + " " + ToHex(currentLength));
+                    //Console.WriteLine(u22 + " " + ToHex(dataChunk, offset + 0x77));
+                }
             } else if (obj.Type == SceneObjectType.Model) {
                 uint u20 = ReadUint32(dataChunk, 0x4F + offset); // Unknown
                 uint u21 = ReadUint32(dataChunk, 0x53 + offset); // Unknown
@@ -179,6 +195,7 @@ namespace JPAssetReader {
                 obj.Group = ReadString(dataChunk, 0xC7 + offset, false);
             }
 
+            Console.WriteLine(obj.Name + ": "+transform.Position+" "+ obj.Group);
             obj.Transform = transform;
 
             return obj;
