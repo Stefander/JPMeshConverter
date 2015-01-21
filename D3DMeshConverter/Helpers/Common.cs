@@ -18,6 +18,10 @@ namespace JPAssetReader {
             return str.Substring(str.LastIndexOf(".")+1);
         }
 
+        public static string GetFile(string path) {
+            return path.Substring(path.LastIndexOf("\\")+1);
+        }
+
         public static string GetPath(string file) {
             return file.Substring(0, file.LastIndexOf("\\"));
         }

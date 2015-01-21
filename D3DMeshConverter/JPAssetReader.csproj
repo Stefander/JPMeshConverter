@@ -73,6 +73,7 @@
     <Compile Include="Helpers\AssetFileDialog.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Reader\ObjectData.cs" />
     <Compile Include="Reader\PropReader.cs" />
     <Compile Include="Reader\SceneReader.cs" />
     <EmbeddedResource Include="Form1.resx">

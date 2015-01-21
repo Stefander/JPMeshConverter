@@ -34,6 +34,8 @@ namespace JPAssetReader {
 
             string extension = Common.GetExtension(fileDialog.FileName);
 
+            return reader; 
+
             if (reader.reader is IMeshReader) {
                 Mesh mesh = reader.mesh;
 
@@ -75,7 +77,8 @@ namespace JPAssetReader {
 
                 // Only process files with the same extension, for neatness
                 if (fileExtension.Equals(extension)) {
-                    Console.WriteLine(file);
+                    JurassicReader r = new JurassicReader();
+                    r.Read(file);
                 }
             }
         }
