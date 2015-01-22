@@ -19,9 +19,8 @@ using System.Windows.Forms;
 
 namespace JPAssetReader {
     public class PropReader : BaseReader {
-        public List<FileEntry> Modules { get; private set; }
-        public List<DependencyEntry> Dependencies { get; private set; }
-        public string RuleFile { get; private set; }
+        public DependencyList Modules { get; private set; }
+        public List<DependencyList> Dependencies { get; private set; }
         
         public override bool Read(uint subType, FileStream stream) {
             base.Read(subType, stream);
@@ -41,7 +40,7 @@ namespace JPAssetReader {
                 return false;
             }
 
-            Modules = ReadFileNameBlock(0x0, false);
+            Modules = ReadDependencyBlock(0x0, false);
             uint dataSize = ReadUint32();
             ObjectData objectData = new ObjectData(ReadChunk(dataSize - 0x4), subType);
             Dependencies = objectData.Dependencies;

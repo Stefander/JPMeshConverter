@@ -217,7 +217,7 @@ namespace JPAssetReader {
             // Parse the 8 file name slots (0: Diffuse, 4: Normal)
             for (int i = 0; i < 8; i++) {
                 byte[] unknown = ReadChunk(4);
-                ReadFileNameBlock(0x32);
+                ReadDependencyBlock(0x32);
             }
 
             byte[] footer = ReadChunk(0x28); // Unknown

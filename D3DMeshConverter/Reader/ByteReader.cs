@@ -48,8 +48,8 @@ namespace JPAssetReader {
             return ReadChunk(size);
         }
 
-        protected uint ReadByte(byte[] data) {
-            uint value = (uint)data[0];
+        protected uint ReadByte(byte[] data, uint offset=0x0) {
+            uint value = (uint)data[offset];
             return value;
         }
 
@@ -57,11 +57,11 @@ namespace JPAssetReader {
             return ReadFloat16(ReadChunk(2), 0);
         }
 
-        protected float ReadFloat16(byte[] data, uint offset) {
+        protected float ReadFloat16(byte[] data, uint offset=0x0) {
             return (ReadUint16(data, offset) / (float)UInt16.MaxValue) * 2;
         }
 
-        protected uint ReadUint32(byte[] data, uint offset) {
+        protected uint ReadUint32(byte[] data, uint offset=0x0) {
             uint value = BitConverter.ToUInt32(data, (int)offset);
             if (type == EndianType.Little) {
                 return value;
@@ -75,7 +75,7 @@ namespace JPAssetReader {
             return b1 << 24 | b2 << 16 | b3 << 8 | b4 << 0;
         }
 
-        protected uint ReadUint16(byte[] data, uint offset) {
+        protected uint ReadUint16(byte[] data, uint offset=0x0) {
             uint value = BitConverter.ToUInt16(data, (int)offset);
             if (type == EndianType.Little) {
                 return value;
@@ -91,7 +91,7 @@ namespace JPAssetReader {
             return ReadString(ReadChunk(length),0,length);
         }
 
-        protected float ReadFloat(byte[] data, uint offset) {
+        protected float ReadFloat(byte[] data, uint offset=0x0) {
             return BitConverter.ToSingle(data, (int)offset);
         }
 
@@ -99,7 +99,7 @@ namespace JPAssetReader {
             return ReadFloat(ReadChunk(4),0);
         }
 
-        protected Vector2 ReadVector2(byte[] data, uint offset) {
+        protected Vector2 ReadVector2(byte[] data, uint offset=0x0) {
             return new Vector2(ReadFloat(data,offset),ReadFloat(data,offset+0x4));
         }
 
@@ -107,7 +107,7 @@ namespace JPAssetReader {
             return ReadVector2(ReadChunk(0x8),0);
         }
 
-        protected Vector3 ReadVector3(byte[] data, uint offset) {
+        protected Vector3 ReadVector3(byte[] data, uint offset=0x0) {
             return new Vector3(ReadFloat(data, offset), ReadFloat(data, offset + 0x4), ReadFloat(data, offset+0x8));
         }
 
@@ -115,7 +115,7 @@ namespace JPAssetReader {
             return ReadVector3(ReadChunk(0xC),0);
         }
 
-        protected Quaternion ReadQuaternion(byte[] data, uint offset) {
+        protected Quaternion ReadQuaternion(byte[] data, uint offset=0x0) {
             return new Quaternion(ReadFloat(data,offset), ReadFloat(data, offset+0x4), ReadFloat(data, offset+0x8), ReadFloat(data, offset+0xC));
         }
 
@@ -140,7 +140,7 @@ namespace JPAssetReader {
             return Encoding.UTF8.GetString(data, (int)offset, (int)length).Trim(removeChars);
         }
 
-        public String ToHex(byte[] array, uint offset=0, int length=-1) {
+        public String ToHex(byte[] array, uint offset=0x0, int length=-1) {
             return BitConverter.ToString(array,(int)offset,(length == -1 ? array.Length-(int)offset : length));
         }
 

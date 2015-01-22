@@ -21,7 +21,7 @@ namespace JPAssetReader {
     class SceneReader : BaseReader, IMeshReader {
         public class SceneObject {
             public string Name;
-            public List<FileEntry> Dependencies;
+            public List<DependencyList> Dependencies;
             public Transform Transform;
             public List<SceneObject> children = new List<SceneObject>();
         }
@@ -63,7 +63,7 @@ namespace JPAssetReader {
                 Vector2 u8 = ReadVector2();
                 uint u9 = ReadUint32();
             } else if (subType == 0x9) {
-                ReadFileNameBlock(0x0, false);
+                ReadDependencyBlock(0x0, false);
                 ReadChunk(0x4C);
             }
 
@@ -71,25 +71,25 @@ namespace JPAssetReader {
 
             uint objectCount = ReadUint32();
             uint i = 0;
-            Console.WriteLine("Object count: "+objectCount);
 
             List<SceneObject> objectList = new List<SceneObject>();
             for (i=0; i < objectCount; i++) {
-                Console.WriteLine("CHUNK " + i);
+                //Console.WriteLine("CHUNK " + i);
                 
                 SceneObject sceneObject = ReadObject();
                 
-                if (sceneObject.Group != null && sceneObject.Group.Length > 0) {
-                    SceneObject parent = objectList.Find(obj => obj.Name.Equals(sceneObject.Group));
+                /*if (sceneObject.Dependencies.Count == 1 && sceneObject.Dependencies[0].Objects.Count == 1) {
+                    string groupName = sceneObject.Dependencies[0].Objects[0];
+                    SceneObject parent = objectList.Find(obj => obj.Name.Equals(groupName));
 
                     if (parent == null) {
-                        Console.WriteLine("Couldn't find parent object '"+sceneObject.Group+"'!");
+                        Console.WriteLine("Couldn't find parent object '"+groupName+"'!");
                         continue; }
 
                     parent.children.Add(sceneObject);
                 } else {
                     Objects.Add(sceneObject);
-                }
+                }*/
 
                 objectList.Add(sceneObject);
             }
@@ -102,46 +102,23 @@ namespace JPAssetReader {
 
             SceneObject obj = new SceneObject() { Name = objectName };
 
-            Console.WriteLine(objectName);
+            //Console.WriteLine(objectName);
 
             byte[] unknownChunk = ReadChunk(0x10);
             uint u10 = ReadUint32(unknownChunk, 0x0);
             uint u11 = ReadUint32(unknownChunk, 0x4);
             uint u12 = ReadUint32(unknownChunk, 0xC);
 
-            //Console.WriteLine("Dependencies:");
-            obj.Dependencies = ReadFileNameBlock(0x0, false);
+            obj.Dependencies = new List<DependencyList>();
+            obj.Dependencies.Add(ReadDependencyBlock(0x0, false));
 
             uint dataSize = ReadUint32();
             
-            CurrentPos();
-            Console.WriteLine("Size: " + ToHex(dataSize));
-
-            byte[] dataChunk = ReadChunk(dataSize - 0x4);
-            Transform transform = new Transform();
+            //CurrentPos();
+            //Console.WriteLine("Size: " + ToHex(dataSize));
             ObjectData objectData = new ObjectData(ReadChunk(dataSize-0x4), SubType);
-            /*
-            if (SubType == 0x9) {
-                uint u18 = ReadUint32(dataChunk, 0x0);
-                if (u18 != 0x0) {
-                    uint u19 = ReadUint32(dataChunk, 0x10);
-                    if (u18 == 0x8 && u19 == 0x1) {
-                        uint u20 = ReadUint32(dataChunk, 0x1AD);
-                        if (u20 == 0x3) {
-
-                        }
-                    }
-                }
-                
-                Console.WriteLine("Ohi: "+obj.Name+": "+ToHex(dataSize)+" "+ToHex(u18));
-                CurrentPos();
-            } else if (SubType == 0x6) {
-                uint u13 = ReadUint32(dataChunk, 0x0);
-
-                
-            }*/
-
-            obj.Transform = transform;
+            obj.Dependencies = objectData.Dependencies;
+            obj.Transform = objectData.transform;
 
             return obj;
         }
@@ -150,9 +127,9 @@ namespace JPAssetReader {
             Mesh mesh = null;
             JurassicReader r = new JurassicReader();
             if (r.Read(path + "\\" + propName)) {
-                List<DependencyEntry> dependencies = (r.reader as PropReader).Dependencies;
-                foreach (DependencyEntry dependency in dependencies) {
-                    foreach (string entry in dependency.Objects) {
+                List<DependencyList> dependencies = (r.reader as PropReader).Dependencies;
+                foreach (DependencyList dependencyList in dependencies) {
+                    foreach (string entry in dependencyList.Objects) {
                         // Only load d3dmeshes, for now :)
                         if (Common.GetExtension(entry).Equals("d3dmesh")) {
                             string meshPath = path + "\\" + entry;
@@ -166,8 +143,7 @@ namespace JPAssetReader {
                                 Mesh propMesh = modelReader.mesh;
                                 if (mesh == null) {
                                     mesh = propMesh;
-                                }
-                                else {
+                                } else {
                                     mesh.Combine(propMesh,objectName);
                                 }
                             }
@@ -188,13 +164,15 @@ namespace JPAssetReader {
             string path = Common.GetPath(_stream.Name);
 
             for (int i = 0; i < obj.Dependencies.Count; i++) {
-                FileEntry file = obj.Dependencies[i];
-                string propPath = path + "\\" + file.Name;
-                if (Common.GetExtension(file.Name).Equals("prop")) {
-                    if (File.Exists(propPath)) {
-                        mesh = StripMesh(path, file.Name, obj.Name);
-                    } else {
-                        Console.WriteLine(file.Name + " does not exist - skipping");
+                DependencyList fileList = obj.Dependencies[i];
+                foreach (string file in fileList.Objects) {
+                    string propPath = path + "\\" + file;
+                    if (Common.GetExtension(file).Equals("prop")) {
+                        if (File.Exists(propPath)) {
+                            mesh = StripMesh(path, file, obj.Name);
+                        } else {
+                            Console.WriteLine(file + " does not exist - skipping");
+                        }
                     }
                 }
             }
@@ -210,8 +188,7 @@ namespace JPAssetReader {
                 if (childMesh != null) {
                     if (mesh == null) {
                         mesh = childMesh;
-                    }
-                    else {
+                    } else {
                         mesh.Combine(childMesh,sceneObject.Name);
                     }
                 }

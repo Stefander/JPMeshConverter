@@ -21,12 +21,17 @@ namespace JPAssetReader {
         Mesh GetMesh();
     }
 
-    public abstract class BaseReader : ByteReader {
-        public struct FileEntry {
-            public string Name;
-            public byte[] Data;
-        }
+    public struct FileEntry {
+        public string Name;
+        public byte[] Data;
 
+        public FileEntry(string name, byte[] data = null) {
+            Name = name;
+            Data = data;
+        }
+    }
+
+    public abstract class BaseReader : ByteReader {
         public uint SubType;
 
         public virtual bool Read(uint subType, FileStream stream) {
@@ -35,22 +40,35 @@ namespace JPAssetReader {
             return true;
         }
 
+        protected DependencyList ReadDependencyBlock(byte[] data, uint offset, uint skipOffset = 0x10) {
+            DependencyList outList = new DependencyList();
+            uint dependencyCount = ReadUint32(data, offset);
+            
+            offset += skipOffset;
+            for (int j = 0; j < dependencyCount; j++) {
+                string fileName = ReadString(data, offset, false);
+                //Console.WriteLine(j+": "+fileName);
+                outList.Add(fileName);
+                offset += (uint)fileName.Length + 0x4;
+            }
+
+            return outList;
+        }
+
         /// <summary>
         /// Reads file name blocks
         /// </summary>
-        protected List<FileEntry> ReadFileNameBlock(uint dataSize, bool hasChecksum=true) {
-            // Read the texture count
-            uint textureCount = ReadUint32();
-
-            List<FileEntry> outList = new List<FileEntry>();
+        protected DependencyList ReadDependencyBlock(uint dataSize, bool hasChecksum=true) {
+            DependencyList outList = new DependencyList();
             
+            // Read the texture count
+            uint dependencyCount = ReadUint32();
             // Read all texture entries
-            for (int i = 0; i < textureCount; i++) {
+            for (int i = 0; i < dependencyCount; i++) {
                 String fileName = ReadString(hasChecksum);
                 byte[] fileData = ReadChunk(dataSize); // Unknown
                 //Console.WriteLine(i+": "+fileName);
-                FileEntry entry = new FileEntry() { Name = fileName, Data = fileData };
-                outList.Add(entry);
+                outList.Add(fileName);
             }
 
             return outList;
