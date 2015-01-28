@@ -75,7 +75,6 @@ namespace JPAssetReader {
             List<SceneObject> objectList = new List<SceneObject>();
             for (i=0; i < objectCount; i++) {
                 //Console.WriteLine("CHUNK " + i);
-                
                 SceneObject sceneObject = ReadObject();
                 
                 /*if (sceneObject.Dependencies.Count == 1 && sceneObject.Dependencies[0].Objects.Count == 1) {
@@ -102,7 +101,7 @@ namespace JPAssetReader {
 
             SceneObject obj = new SceneObject() { Name = objectName };
 
-            //Console.WriteLine(objectName);
+            Console.WriteLine(objectName);
 
             byte[] unknownChunk = ReadChunk(0x10);
             uint u10 = ReadUint32(unknownChunk, 0x0);
@@ -119,7 +118,7 @@ namespace JPAssetReader {
             ObjectData objectData = new ObjectData(ReadChunk(dataSize-0x4), SubType);
             obj.Dependencies = objectData.Dependencies;
             obj.Transform = objectData.transform;
-
+            Console.WriteLine(obj.Dependencies.Count);
             return obj;
         }
 
