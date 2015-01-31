@@ -36,8 +36,10 @@ namespace JPAssetReader {
                 ReadChunk(0x49);
             } else if (subType == 0x9) {
                 ReadChunk(0x6D);
+            } else if (subType == 0xA) {
+                ReadChunk(0x79);
             } else {
-                MessageBox.Show("Subtype "+subType+" not supported!");
+                MessageBox.Show("Subtype " + ToHex(subType) + " not supported!");
                 return false;
             }
             
@@ -45,27 +47,8 @@ namespace JPAssetReader {
             Name = ReadString();
 
             uint u1 = ReadUint32();
-
-            if (subType == 0x6) {
-                ReadChunk(0x4);
-                uint u2 = ReadUint32();
-                ReadChunk(0x9);
-                float u3 = ReadFloat();
-                ReadByte();
-                float u4 = ReadFloat();
-                byte[] unknownChunk = ReadChunk(0x8); // Zero, padding?
-                Vector2 u5 = ReadVector2();
-                ReadByte();
-                float u6 = ReadFloat();
-                ReadChunk(0x8); // Zero, padding?
-                Vector2 u7 = ReadVector2();
-                ReadChunk(0x5);
-                Vector2 u8 = ReadVector2();
-                uint u9 = ReadUint32();
-            } else if (subType == 0x9) {
-                ReadDependencyBlock(0x0, false);
-                ReadChunk(0x4C);
-            }
+            ReadDependencyBlock(0x0, false);
+            ReadChunk(0x4C);
 
             Objects = new List<SceneObject>();
 
@@ -101,7 +84,7 @@ namespace JPAssetReader {
 
             SceneObject obj = new SceneObject() { Name = objectName };
 
-            Console.WriteLine(objectName);
+            //Console.WriteLine(objectName);
 
             byte[] unknownChunk = ReadChunk(0x10);
             uint u10 = ReadUint32(unknownChunk, 0x0);
@@ -118,7 +101,7 @@ namespace JPAssetReader {
             ObjectData objectData = new ObjectData(ReadChunk(dataSize-0x4), SubType);
             obj.Dependencies = objectData.Dependencies;
             obj.Transform = objectData.transform;
-            Console.WriteLine(obj.Dependencies.Count);
+            //Console.WriteLine(obj.Dependencies.Count);
             return obj;
         }
 

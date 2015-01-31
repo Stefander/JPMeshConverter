@@ -36,8 +36,7 @@ namespace JPAssetReader {
                 byte[] unknownChunk = ReadChunk(0x10);
                 uint u1 = ReadUint32(unknownChunk, 0xC);
             } else {
-                Console.WriteLine(_stream.Name+": Subtype "+subType+" not supported!");
-                //MessageBox.Show(_stream.Name+": Subtype "+subType+" not supported!");
+                Console.WriteLine(_stream.Name+": Subtype "+ToHex(subType)+" not supported!");
                 return false;
             }
 
