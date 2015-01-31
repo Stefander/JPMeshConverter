@@ -40,17 +40,22 @@ namespace JPAssetReader {
             return true;
         }
 
-        protected DependencyList ReadDependencyBlock(byte[] data, uint offset, uint skipOffset = 0x10) {
+        protected DependencyList ReadDependencyBlock(byte[] data, uint offset, out uint size, uint skipOffset = 0x10, uint dataSize = 0x0) {
             DependencyList outList = new DependencyList();
             uint dependencyCount = ReadUint32(data, offset);
-            
+            uint startOffset = offset;
+
             offset += skipOffset;
             for (int j = 0; j < dependencyCount; j++) {
                 string fileName = ReadString(data, offset, false);
-                //Console.WriteLine(j+": "+fileName);
-                outList.Add(fileName);
-                offset += (uint)fileName.Length + 0x4;
+                if (fileName.Length > 0) {
+                    //Console.WriteLine(j + ": " + fileName);
+                    outList.Add(fileName); }
+
+                offset += (uint)fileName.Length + 0x4 + dataSize;
             }
+
+            size = offset-startOffset;
 
             return outList;
         }

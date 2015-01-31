@@ -31,7 +31,7 @@ namespace JPAssetReader {
             // Decide which reader to use, or show an error when failed
             bool success = ReadHeader();
 
-            Console.WriteLine(Common.GetFile(_stream.Name)+": "+ToHex(SubType));
+            //Console.WriteLine(Common.GetFile(_stream.Name)+": "+ToHex(SubType));
             if (success && SetReader()) {
                 success = reader.Read(SubType, _stream);
             }

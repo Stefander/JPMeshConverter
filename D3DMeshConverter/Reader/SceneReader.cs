@@ -21,6 +21,7 @@ namespace JPAssetReader {
     class SceneReader : BaseReader, IMeshReader {
         public class SceneObject {
             public string Name;
+            public DependencyList Modules;
             public List<DependencyList> Dependencies;
             public Transform Transform;
             public List<SceneObject> children = new List<SceneObject>();
@@ -57,22 +58,21 @@ namespace JPAssetReader {
 
             List<SceneObject> objectList = new List<SceneObject>();
             for (i=0; i < objectCount; i++) {
-                //Console.WriteLine("CHUNK " + i);
                 SceneObject sceneObject = ReadObject();
-                
-                /*if (sceneObject.Dependencies.Count == 1 && sceneObject.Dependencies[0].Objects.Count == 1) {
+                SceneObject parent = null;
+                if (sceneObject.Dependencies.Count == 1 && sceneObject.Dependencies[0].Objects.Count == 1) {
                     string groupName = sceneObject.Dependencies[0].Objects[0];
-                    SceneObject parent = objectList.Find(obj => obj.Name.Equals(groupName));
+                    Console.WriteLine(sceneObject.Name+": "+groupName);
+                    parent = objectList.Find(obj => obj.Name.Equals(groupName));
 
-                    if (parent == null) {
-                        Console.WriteLine("Couldn't find parent object '"+groupName+"'!");
-                        continue; }
-
-                    parent.children.Add(sceneObject);
+                    if (parent != null) {
+                        parent.children.Add(sceneObject);
+                    } else {
+                        Objects.Add(sceneObject); }
                 } else {
                     Objects.Add(sceneObject);
-                }*/
-
+                }
+                
                 objectList.Add(sceneObject);
             }
 
@@ -91,8 +91,7 @@ namespace JPAssetReader {
             uint u11 = ReadUint32(unknownChunk, 0x4);
             uint u12 = ReadUint32(unknownChunk, 0xC);
 
-            obj.Dependencies = new List<DependencyList>();
-            obj.Dependencies.Add(ReadDependencyBlock(0x0, false));
+            obj.Modules = ReadDependencyBlock(0x0, false);
 
             uint dataSize = ReadUint32();
             
@@ -101,7 +100,6 @@ namespace JPAssetReader {
             ObjectData objectData = new ObjectData(ReadChunk(dataSize-0x4), SubType);
             obj.Dependencies = objectData.Dependencies;
             obj.Transform = objectData.transform;
-            //Console.WriteLine(obj.Dependencies.Count);
             return obj;
         }
 
@@ -112,6 +110,7 @@ namespace JPAssetReader {
                 List<DependencyList> dependencies = (r.reader as PropReader).Dependencies;
                 foreach (DependencyList dependencyList in dependencies) {
                     foreach (string entry in dependencyList.Objects) {
+                        Console.WriteLine("p:"+entry);
                         // Only load d3dmeshes, for now :)
                         if (Common.GetExtension(entry).Equals("d3dmesh")) {
                             string meshPath = path + "\\" + entry;
@@ -144,17 +143,13 @@ namespace JPAssetReader {
             matrix.Rotate(obj.Transform.Rotation);
 
             string path = Common.GetPath(_stream.Name);
-
-            for (int i = 0; i < obj.Dependencies.Count; i++) {
-                DependencyList fileList = obj.Dependencies[i];
-                foreach (string file in fileList.Objects) {
-                    string propPath = path + "\\" + file;
-                    if (Common.GetExtension(file).Equals("prop")) {
-                        if (File.Exists(propPath)) {
-                            mesh = StripMesh(path, file, obj.Name);
-                        } else {
-                            Console.WriteLine(file + " does not exist - skipping");
-                        }
+            foreach (string file in obj.Modules.Objects) {
+                string propPath = path + "\\" + file;
+                if (Common.GetExtension(file).Equals("prop")) {
+                    if (File.Exists(propPath)) {
+                        mesh = StripMesh(path, file, obj.Name);
+                    } else {
+                        Console.WriteLine(file + " does not exist - skipping");
                     }
                 }
             }

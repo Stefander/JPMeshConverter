@@ -34,8 +34,6 @@ namespace JPAssetReader {
 
             string extension = Common.GetExtension(fileDialog.FileName);
 
-            return reader; 
-
             if (reader.reader is IMeshReader) {
                 Mesh mesh = reader.mesh;
 

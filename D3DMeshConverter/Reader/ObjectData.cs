@@ -24,11 +24,13 @@ namespace JPAssetReader {
 
         public ObjectData(byte[] inData, uint subType) {
             data = inData;
-            Dependencies = new List<DependencyList>();
             transform = new Transform();
 
             offset = 0;
             uint u1 = ReadUint32(data);
+
+            DependencyList dependencyList = new DependencyList();
+            Dependencies = new List<DependencyList>() { dependencyList };
 
             if (u1 < 2) {
                 return; }
@@ -42,28 +44,84 @@ namespace JPAssetReader {
             if (u3 >= 0x1 && u3 <= 0x7) {
                 while (u3 >= 0x1 && u3 <= 0x7) {
                     dependencyOffset -= 0x10;
-                    u3 = ReadUint32(data, dependencyOffset - 4); }
+                    u3 = ReadUint32(data, dependencyOffset - 4);
+                }
             }
 
-            int stringCount = 0;
+            uint oldOffset = dependencyOffset;
+            while (ReadUint32(data, dependencyOffset - 0x8) != 0x73E09E0F && dependencyOffset > 0x8) {
+                dependencyOffset--;
+            }
 
-            while(ReadUint32(data,dependencyOffset-0x4) != stringCount) {
-                uint stringLength = 2;
-
-                while (ReadUint16(data, dependencyOffset - stringLength) != stringLength - 4) {
-                    stringLength++;
+            if (dependencyOffset > 0x8) {
+                //Console.WriteLine("Found alignment");
+                uint count = 0;
+                
+                // Check for false positive
+                if (ReadUint32(data, dependencyOffset+0x10) == 0) {
+                    return;
                 }
 
-                //Console.WriteLine(stringCount+": "+ReadString(data, dependencyOffset - stringLength, false));
-                dependencyOffset -= stringLength;
+                while (dependencyOffset < data.Length && ReadUint32(data,dependencyOffset-0x8) != 0xA5B4E052) {
+                    uint size;
+                    uint dependencyCount = ReadUint32(data, dependencyOffset);
+                    
+                    /*if () {//ReadUint32(data,dependencyOffset-0x8) != ) {
+                        
+                        /*uint strCount = ReadUint32(data,dependencyOffset);
+                        dependencyOffset += 0x14;
+                        for (int s = 0; s < 4; s++) {
+                            string str = ReadString(data, dependencyOffset, false);
+                            dependencyList.Add(str);
+                            uint sOffset = (uint)(s == 0 ? 0x1C : s == 1 ? 0x24 : s == 2 ? 0x20 : 0x4);
+                            dependencyOffset+=sOffset+(uint)str.Length;
+                        }
+                    } else {*/
+                        foreach (string entry in ReadDependencyBlock(data, dependencyOffset, out size,0x10,0xC).Objects) {
+                            dependencyList.Add(entry); }
+                        dependencyOffset += size;
+                    //}
+                    count++;
+                }
+            }
+            else {
+                dependencyOffset = oldOffset;
 
-                uint prefix = ReadUint32(data, dependencyOffset - 0x4);
-                if (prefix == 0) {
-                    dependencyOffset -= 0xC; }
-                else if(prefix == 1 || stringLength == prefix-0x4) {
-                    break; }
+                // check if there is a string to read
+                uint textOffset = 0;
+                while(ReadUint32(data,dependencyOffset-textOffset-4) != textOffset && dependencyOffset-textOffset > 4) {
+                    textOffset++;
+                }
 
-                stringCount++;
+                bool hasText = dependencyOffset - textOffset > 4;
+
+                if (hasText) {
+                    int stringCount = 0;
+                    while (ReadUint32(data, dependencyOffset - 0x4) != stringCount) {
+                        uint stringLength = 2;
+
+                        while (ReadUint16(data, dependencyOffset - stringLength) != stringLength - 4) {
+                            stringLength++;
+                            if (dependencyOffset - stringLength <= 0x4) {
+                                return;
+                            }
+                        }
+
+                        string dependencyName = ReadString(data, dependencyOffset - stringLength, false);
+                        dependencyList.Add(dependencyName);
+                        dependencyOffset -= stringLength;
+
+                        uint prefix = ReadUint32(data, dependencyOffset - 0x4);
+                        if (prefix == 0) {
+                            dependencyOffset -= 0xC;
+                        }
+                        else if (prefix == 1 || stringLength == prefix - 0x4) {
+                            break;
+                        }
+
+                        stringCount++;
+                    }
+                }
             }
 
             dependencyOffset -= 0x60;
@@ -77,14 +135,12 @@ namespace JPAssetReader {
             }
 
             // Only read scale when needed
-            if (ReadUint32(data, dependencyOffset - 0x10) == 0x2) {
+            if (ReadUint32(data, dependencyOffset - 0x10) <= 0x2) {
                 transform.Scale = ReadVector3(data, dependencyOffset); }
 
             // Read transform data
             transform.Position = ReadVector3(data, 0x18 + dependencyOffset);
             transform.Rotation = ReadQuaternion(data, 0x40 + dependencyOffset);
-
-            Console.WriteLine(transform.Scale + " " + transform.Position + " " + transform.Rotation);
         }
     }
 }
