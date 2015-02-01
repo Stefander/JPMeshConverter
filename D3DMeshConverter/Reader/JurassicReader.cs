@@ -31,9 +31,8 @@ namespace JPAssetReader {
             // Decide which reader to use, or show an error when failed
             bool success = ReadHeader();
 
-            //Console.WriteLine(Common.GetFile(_stream.Name)+": "+ToHex(SubType));
             if (success && SetReader()) {
-                success = reader.Read(SubType, _stream);
+                success = reader.Read(_stream);
             }
 
             // Close the stream
@@ -53,7 +52,7 @@ namespace JPAssetReader {
             if (extension.Equals("d3dmesh")) {
                 reader = new D3DReader();
             } else if (extension.Equals("lang")) {
-                reader = new LanguageReader();
+                reader = new LocalizationReader();
             } else if (extension.Equals("prop")) {
                 reader = new PropReader();
             } else if (extension.Equals("scene")) {
@@ -75,12 +74,13 @@ namespace JPAssetReader {
 
             // Make sure it's a valid Telltale file
             if (!identifier.Equals("ERTM")) {
-                SubType = 0;
                 return false;
             }
 
-            // 0x4: Model type
-            SubType = ReadUint32();
+            // Skip header data
+            uint u = ReadUint32();
+            ReadChunk(u*0xC);
+
             return true;
         }
     }

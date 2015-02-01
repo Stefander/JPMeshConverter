@@ -21,22 +21,23 @@ namespace JPAssetReader {
         public string Text;
     }
 
-    public class LanguageReader : BaseReader {
+    public class LocalizationReader : BaseReader {
         public List<LanguageEntry> entries;
 
-        public override bool Read(uint subType, FileStream stream) {
-            base.Read(subType, stream);
+        public override bool Read(FileStream stream) {
+            base.Read(stream);
+            ReadChunk(0x1C);
 
             entries = new List<LanguageEntry>();
-            byte[] header = ReadChunk(0x4C);
             
+            // Read all the entries in the file
             uint entryCount = ReadUint32();
             for (int i = 0; i < entryCount; i++) {
-                entries.Add(ReadLanguageString());
+                LanguageEntry lang = ReadLanguageString();
+                entries.Add(lang);
             }
 
-            byte[] footer = ReadChunk(0x24);
-            uint unknown = ReadUint32(footer,0x4);
+            ReadChunk(0x24);
             
             return true;
         }
@@ -44,8 +45,7 @@ namespace JPAssetReader {
         private LanguageEntry ReadLanguageString() {
             string name = ReadString();
             string content = ReadString();
-            uint u1 = ReadUint32();
-            uint u2 = ReadUint32();
+            ReadChunk(0x8);
             return new LanguageEntry() { Name = name, Text = content };
         }
     }

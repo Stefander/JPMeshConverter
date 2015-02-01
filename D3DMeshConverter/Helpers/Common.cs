@@ -14,6 +14,10 @@
 
 namespace JPAssetReader {
     public static class Common {
+        public static string GetFileName(string str) {
+            return str.Substring(0,str.LastIndexOf("."));
+        }
+
         public static string GetExtension(string str) {
             return str.Substring(str.LastIndexOf(".")+1);
         }

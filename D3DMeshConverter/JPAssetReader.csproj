@@ -58,6 +58,7 @@
   <ItemGroup>
     <Compile Include="Helpers\Common.cs" />
     <Compile Include="Helpers\Matrix.cs" />
+    <Compile Include="Helpers\OpenResourceDialog.cs" />
     <Compile Include="Reader\ByteReader.cs" />
     <Compile Include="Form1.cs">
       <SubType>Form</SubType>
@@ -68,9 +69,8 @@
     <Compile Include="Reader\BaseReader.cs" />
     <Compile Include="Reader\D3DReader.cs" />
     <Compile Include="Reader\JurassicReader.cs" />
-    <Compile Include="Reader\LanguageReader.cs" />
+    <Compile Include="Reader\LocalizationReader.cs" />
     <Compile Include="Reader\Mesh.cs" />
-    <Compile Include="Helpers\AssetFileDialog.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Reader\ObjectData.cs" />

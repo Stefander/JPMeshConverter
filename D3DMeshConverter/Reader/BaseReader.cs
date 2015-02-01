@@ -13,7 +13,6 @@
 */
 
 using System;
-using System.Collections.Generic;
 using System.IO;
 
 namespace JPAssetReader {
@@ -32,24 +31,31 @@ namespace JPAssetReader {
     }
 
     public abstract class BaseReader : ByteReader {
-        public uint SubType;
+        protected string resourcePath;
+        private OpenResourceDialog resourceDialog;
 
-        public virtual bool Read(uint subType, FileStream stream) {
-            SubType = subType;
+        public virtual bool Read(FileStream stream) {
+            resourcePath = Common.GetPath(stream.Name);
+            resourceDialog = new OpenResourceDialog(System.AppDomain.CurrentDomain.BaseDirectory, "Open JP Resource", "JP Resource Files|*.d3dmesh;*.lang;*.prop;*.scene;*.skl|D3D Mesh|*.d3dmesh|Localization|*.lang|All files (*.*)|*.*");
             _stream = stream;
             return true;
+        }
+
+        protected void AdjustResourcePath() {
+            if (!resourceDialog.Open()) {
+                return; }
+
+            resourcePath = Common.GetPath(resourceDialog.FileName);
         }
 
         protected DependencyList ReadDependencyBlock(byte[] data, uint offset, out uint size, uint skipOffset = 0x10, uint dataSize = 0x0) {
             DependencyList outList = new DependencyList();
             uint dependencyCount = ReadUint32(data, offset);
             uint startOffset = offset;
-
             offset += skipOffset;
             for (int j = 0; j < dependencyCount; j++) {
                 string fileName = ReadString(data, offset, false);
                 if (fileName.Length > 0) {
-                    //Console.WriteLine(j + ": " + fileName);
                     outList.Add(fileName); }
 
                 offset += (uint)fileName.Length + 0x4 + dataSize;
@@ -58,6 +64,11 @@ namespace JPAssetReader {
             size = offset-startOffset;
 
             return outList;
+        }
+
+        protected ObjectMeta ReadObjectMeta() {
+            uint metaSize = ReadUint32();
+            return new ObjectMeta(ReadChunk(metaSize - 0x4));
         }
 
         /// <summary>
@@ -77,6 +88,18 @@ namespace JPAssetReader {
             }
 
             return outList;
+        }
+
+        /// <summary>
+        /// Reads and returns the filetype at the start of the header
+        /// </summary>
+        /// <returns></returns>
+        protected uint GetFileType() {
+            uint pos = (uint)_stream.Position;
+            _stream.Seek(0x4, SeekOrigin.Begin);
+            uint fileType = ReadUint32();
+            _stream.Seek(pos, SeekOrigin.Begin);
+            return fileType;
         }
 
         /// <summary>

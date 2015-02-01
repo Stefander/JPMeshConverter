@@ -12,38 +12,22 @@
  * IN THE SOFTWARE.
 */
 
-using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Windows.Forms;
 
 namespace JPAssetReader {
     public class PropReader : BaseReader {
         public DependencyList Modules { get; private set; }
         public List<DependencyList> Dependencies { get; private set; }
         
-        public override bool Read(uint subType, FileStream stream) {
-            base.Read(subType, stream);
-            uint headerSize = (uint)(subType == 0x5 || subType == 0x4 ? 0x30 : subType == 0x3 ? 0x24 : 0x18);
-            byte[] header = ReadChunk(headerSize);
+        public override bool Read(FileStream stream) {
+            base.Read(stream);
 
-            if (subType == 0x2 || subType == 0x3 || subType == 0x4) {
-                uint u1 = ReadUint32();
-                uint u2 = ReadUint32(); // Zero
-                uint u3 = ReadUint32();
-            } else if (subType == 0x5) {
-                byte[] identifier = ReadChunk(0x8);
-                byte[] unknownChunk = ReadChunk(0x10);
-                uint u1 = ReadUint32(unknownChunk, 0xC);
-            } else {
-                Console.WriteLine(_stream.Name+": Subtype "+ToHex(subType)+" not supported!");
-                return false;
-            }
+            ReadChunk(0xC);
 
             Modules = ReadDependencyBlock(0x0, false);
-            uint dataSize = ReadUint32();
-            ObjectData objectData = new ObjectData(ReadChunk(dataSize - 0x4), subType);
-            Dependencies = objectData.Dependencies;
+            ObjectMeta meta = ReadObjectMeta();
+            Dependencies = meta.Dependencies;
 
             return true;
         }

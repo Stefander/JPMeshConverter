@@ -73,15 +73,21 @@ namespace JPAssetReader {
         }
 
         public void Translate(Vector3 position) {
-            m03 += position.X;
-            m13 += position.Y;
-            m23 += position.Z;
+            Matrix r = Matrix.identity;
+            r.m03 = position.X;
+            r.m13 = position.Y;
+            r.m23 = position.Z;
+
+            this *= r;
         }
 
         public void Scale(Vector3 scale) {
-            m00 *= scale.X;
-            m11 *= scale.Y;
-            m22 *= scale.Z;
+            Matrix r = Matrix.identity;
+            r.m00 = scale.X;
+            r.m11 = scale.Y;
+            r.m22 = scale.Z;
+
+            this *= r;
         }
 
         public void Rotate(Quaternion q) {

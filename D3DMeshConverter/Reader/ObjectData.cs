@@ -1,4 +1,17 @@
-﻿using System;
+﻿/*
+ * Copyright (c) 2015 Stefan Wijnker
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), 
+ * to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, 
+ * and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS 
+ * IN THE SOFTWARE.
+*/
+
 using System.Collections.Generic;
 
 namespace JPAssetReader {
@@ -16,106 +29,81 @@ namespace JPAssetReader {
         }
     }
 
-    public class ObjectData : BaseReader {
+    public class ObjectMeta : BaseReader {
         public List<DependencyList> Dependencies;
         public Transform transform;
         private byte[] data;
-        private uint offset;
 
-        public ObjectData(byte[] inData, uint subType) {
+        public ObjectMeta(byte[] inData) {
             data = inData;
             transform = new Transform();
 
-            offset = 0;
             uint u1 = ReadUint32(data);
 
             DependencyList dependencyList = new DependencyList();
-            Dependencies = new List<DependencyList>() { dependencyList };
 
-            if (u1 < 2) {
+            ReadDependencies(dependencyList);
+            ReadTransform();
+
+            Dependencies = new List<DependencyList>() { dependencyList };
+        }
+
+        private void ReadDependencies(DependencyList list) {
+            if (data.Length < 0x14) {
                 return; }
 
-            offset += 0x10;
-            uint u2 = ReadUint32(data,offset);
-
-            uint dependencyOffset = (uint)data.Length;
-            uint u3 = ReadUint32(data, dependencyOffset-4);
-
-            if (u3 >= 0x1 && u3 <= 0x7) {
-                while (u3 >= 0x1 && u3 <= 0x7) {
-                    dependencyOffset -= 0x10;
-                    u3 = ReadUint32(data, dependencyOffset - 4);
-                }
+            uint localOffset = (uint)data.Length;
+            
+            // Make sure to align the data
+            localOffset-=0xC;
+            while (ReadUint32(data, localOffset + 0x8) != 0x7ADB4E5A && localOffset > 0) {
+                localOffset--;
             }
 
-            uint oldOffset = dependencyOffset;
-            while (ReadUint32(data, dependencyOffset - 0x8) != 0x73E09E0F && dependencyOffset > 0x8) {
-                dependencyOffset--;
-            }
+            if (localOffset > 0x8) {
+                uint size;
+                foreach (string entry in ReadDependencyBlock(data, localOffset, out size, 0x10, 0xC).Objects) {
+                    list.Add(entry); }
+            } else {
+                localOffset = (uint)data.Length;
+                uint u3 = ReadUint32(data, localOffset - 4);
 
-            if (dependencyOffset > 0x8) {
-                //Console.WriteLine("Found alignment");
-                uint count = 0;
-                
-                // Check for false positive
-                if (ReadUint32(data, dependencyOffset+0x10) == 0) {
-                    return;
+                if (u3 >= 0x1 && u3 <= 0x7) {
+                    while (u3 >= 0x1 && u3 <= 0x7) {
+                        localOffset -= 0x10;
+                        u3 = ReadUint32(data, localOffset - 4);
+                    }
                 }
-
-                while (dependencyOffset < data.Length && ReadUint32(data,dependencyOffset-0x8) != 0xA5B4E052) {
-                    uint size;
-                    uint dependencyCount = ReadUint32(data, dependencyOffset);
-                    
-                    /*if () {//ReadUint32(data,dependencyOffset-0x8) != ) {
-                        
-                        /*uint strCount = ReadUint32(data,dependencyOffset);
-                        dependencyOffset += 0x14;
-                        for (int s = 0; s < 4; s++) {
-                            string str = ReadString(data, dependencyOffset, false);
-                            dependencyList.Add(str);
-                            uint sOffset = (uint)(s == 0 ? 0x1C : s == 1 ? 0x24 : s == 2 ? 0x20 : 0x4);
-                            dependencyOffset+=sOffset+(uint)str.Length;
-                        }
-                    } else {*/
-                        foreach (string entry in ReadDependencyBlock(data, dependencyOffset, out size,0x10,0xC).Objects) {
-                            dependencyList.Add(entry); }
-                        dependencyOffset += size;
-                    //}
-                    count++;
-                }
-            }
-            else {
-                dependencyOffset = oldOffset;
 
                 // check if there is a string to read
                 uint textOffset = 0;
-                while(ReadUint32(data,dependencyOffset-textOffset-4) != textOffset && dependencyOffset-textOffset > 4) {
+                while (ReadUint32(data, localOffset - textOffset - 4) != textOffset && localOffset - textOffset > 4) {
                     textOffset++;
                 }
 
-                bool hasText = dependencyOffset - textOffset > 4;
+                bool hasText = localOffset - textOffset > 4;
 
                 if (hasText) {
                     int stringCount = 0;
-                    while (ReadUint32(data, dependencyOffset - 0x4) != stringCount) {
-                        uint stringLength = 2;
+                    while (ReadUint32(data, localOffset - 0x4) != stringCount) {
+                        uint stringLength = 0;
 
-                        while (ReadUint16(data, dependencyOffset - stringLength) != stringLength - 4) {
+                        while (ReadUint32(data, localOffset - stringLength - 0x4) != stringLength) {
                             stringLength++;
-                            if (dependencyOffset - stringLength <= 0x4) {
-                                return;
-                            }
+                            uint character = ReadByte(data,localOffset-stringLength);
+                            if (localOffset - stringLength <= 0x4) {
+                                return; }
                         }
 
-                        string dependencyName = ReadString(data, dependencyOffset - stringLength, false);
-                        dependencyList.Add(dependencyName);
-                        dependencyOffset -= stringLength;
+                        string dependencyName = ReadString(data, localOffset - stringLength - 0x4, false);
 
-                        uint prefix = ReadUint32(data, dependencyOffset - 0x4);
+                        list.Add(dependencyName);
+                        localOffset -= stringLength + 4;
+
+                        uint prefix = ReadUint32(data, localOffset - 0x4);
                         if (prefix == 0) {
-                            dependencyOffset -= 0xC;
-                        }
-                        else if (prefix == 1 || stringLength == prefix - 0x4) {
+                            localOffset -= 0xC;
+                        } else if (prefix == 1 || stringLength == prefix - 8) {
                             break;
                         }
 
@@ -123,24 +111,33 @@ namespace JPAssetReader {
                     }
                 }
             }
+        }
 
-            dependencyOffset -= 0x60;
+        private void ReadTransform() {
+            if (data.Length < 0x54) {
+                return; }
+
+            // Skip to the start of the block
+            uint localOffset = (uint)data.Length-0x50;
 
             // Make sure to align the data properly
-            while (ReadUint32(data, dependencyOffset + 0x38) != 0x53F29BE3) {
-                dependencyOffset--;
+            while (ReadUint32(data, localOffset + 0x38) != 0x53F29BE3) {
+                localOffset--;
 
-                if (dependencyOffset + 0x38 == 0) {
+                if (localOffset < 0x10) {
                     return; }
             }
 
             // Only read scale when needed
-            if (ReadUint32(data, dependencyOffset - 0x10) <= 0x2) {
-                transform.Scale = ReadVector3(data, dependencyOffset); }
+            if (ReadUint32(data, localOffset - 0x10) == 0x2) {
+                transform.Scale = ReadVector3(data, localOffset);
+            }
 
             // Read transform data
-            transform.Position = ReadVector3(data, 0x18 + dependencyOffset);
-            transform.Rotation = ReadQuaternion(data, 0x40 + dependencyOffset);
+            transform.Position = ReadVector3(data, 0x18 + localOffset);
+            transform.Rotation = ReadQuaternion(data, 0x40 + localOffset);
+
+            //Console.WriteLine(ToHex(ReadUint32(data, localOffset - 0x10))+" "+transform.Scale+" "+transform.Position+" "+transform.Rotation);
         }
     }
 }

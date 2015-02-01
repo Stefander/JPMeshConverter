@@ -14,22 +14,24 @@
 
 using System;
 using System.IO;
-using System.Windows.Forms;
 
 namespace JPAssetReader {
     class D3DReader : BaseReader, IMeshReader {
         private Mesh mesh;
         private Vector2 UVScale;
+        private string Name;
 
-        public override bool Read(uint subType, FileStream stream) {
-            base.Read(subType, stream);
+        public override bool Read(FileStream stream) {
+            base.Read(stream);
 
-            if(subType != 0xD && subType != 0xE) {
-                MessageBox.Show("Subtype "+subType+" not supported!");
-                return false;
-            }
+            Name = ReadString();
 
-            ReadHeader();
+            ReadChunk(0x6); // Unknown
+
+            Vector3 pos1 = ReadVector3(); // Min AABB?
+            Vector3 pos2 = ReadVector3(); // Max AABB?
+
+            ReadChunk(0x18);
 
             mesh = new Mesh();
 
@@ -39,20 +41,17 @@ namespace JPAssetReader {
                 mesh.Chunks.Add(chunk);
             }
 
-            byte[] unknownChunk = ReadChunk(0x8); // Zero
-
-            if (SubType == 0xE) {
+            ReadChunk(0x8);
+            if (GetFileType() == 0xE) {
                 uint unknownSize = ReadUint32(); // Size of chunk
-                uint count2 = ReadUint32(); // Unknown
-                uint count3 = ReadUint32(); // Unknown
+                ReadChunk(0x8);
                 ReadChunk(unknownSize);
-            }
-            else {
+            } else {
                 // Alternating 0x8 and 0x0
                 ReadPadding(5);
             }
 
-            ReadMaterial();
+            ReadMeta();
             ParseMeshData();
 
             return true;
@@ -62,47 +61,23 @@ namespace JPAssetReader {
             return mesh;
         }
 
-        private void ReadHeader() {
-            // 0x8: Unknown, constant
-            ReadChunk(0x60);
-
-            // 0x68: Unknown, constant, but varies with type
-            int chunkSize = SubType == 0xE ? 0x48 : 0x3C;
-            ReadChunk((uint)chunkSize); // Unknown
-
-            // 0xB8: Model name
-            String meshName = ReadString();
-
-            byte[] unknownChunk = ReadChunk(0x6); // Unknown
-
-            Vector3 pos1 = ReadVector3(); // Min AABB?
-            Vector3 pos2 = ReadVector3(); // Max AABB?
-
-            uint unknown = ReadUint32(); // 20?
-
-            unknownChunk = ReadChunk(0x14);
-        }
-
         /// <summary>
         /// Parses mesh vertices and triangles
         /// </summary>
         private void ParseMeshData() {
-            ReadChunk(0x2);
-            ReadPadding(3);
-            ReadUint32(); // Constant: 0x653030
-            ReadChunk(0x2);
+            ReadChunk(0x14);
 
-            uint u1 = ReadUint32(); // Unknown
-            uint u2 = ReadUint32(); // Unknown
-            uint u3 = ReadUint32(); // Unknown
+            uint indicesCount = ReadUint32();
+
+            ReadChunk(0x8);
 
             // Parse triangle data
-            // Triangles are specified by 3 unsigned 16 bit integers
-            for (int i = 0; i < u1 / 3; i++) {
-                uint v1 = ReadUint16();
-                uint v2 = ReadUint16();
-                uint v3 = ReadUint16();
-                Triangle f = new Triangle() { V1 = v1, V2 = v2, V3 = v3 };
+            // Triangles are specified by 3 vertex indices
+            for (int i = 0; i < indicesCount / 3; i++) {
+                uint vi1 = ReadUint16();
+                uint vi2 = ReadUint16();
+                uint vi3 = ReadUint16();
+                Triangle f = new Triangle() { V1 = vi1, V2 = vi2, V3 = vi3 };
                 mesh.Triangles.Add(f);
             }
 
@@ -112,11 +87,7 @@ namespace JPAssetReader {
             // Size of every vertex declaration
             uint vertexDataSize = ReadUint32();
 
-            byte[] unknown1 = ReadChunk(0x28); // Constant
-            byte[] unknown2 = ReadChunk(0x3C);
-            byte[] unknown3 = ReadChunk(0x3C);
-
-            ReadChunk(0xC); // zero
+            ReadChunk(0xAC);
 
             // Parse all vertices
             for (uint j = 0; j < vertexCount; j++) {
@@ -152,6 +123,9 @@ namespace JPAssetReader {
 
                 Vertex v = new Vertex() { Index = j, Position = p, UV = uv, Normal = normal };
                 mesh.Vertices.Add(v);
+
+                // Sort all the textures according to texture
+                mesh.SortChunks();
             }
         }
 
@@ -162,25 +136,22 @@ namespace JPAssetReader {
         /// <returns>Mesh chunk</returns>
         private MeshChunk ReadMeshChunk(uint index) {
             MeshChunk chunk = new MeshChunk();
+            chunk.Name = Common.GetFileName(Name);
             chunk.Index = index;
 
-            byte[] unknownChunk = ReadChunk(0x24);
-            uint unknownIndex = ReadUint32(unknownChunk, 0x18);
+            ReadChunk(0x24);
 
             chunk.FirstVertex = ReadUint32();
             chunk.LastVertex = ReadUint32();
             chunk.FaceOffset = (ReadUint32() / 3);
             chunk.FaceCount = ReadUint32();
 
-            unknownChunk = ReadChunk(0xC);
-            Vector3 unknownpos1 = ReadVector3();
-            Vector3 unknownpos2 = ReadVector3();
+            ReadChunk(0xC);
 
-            unknownChunk = ReadChunk(0x18);
-            uint materialIndex = ReadUint32(unknownChunk, 0x14);
+            Vector3 u1 = ReadVector3();
+            Vector3 u2 = ReadVector3();
 
-            unknownChunk = ReadChunk(0x1C);
-            uint unknownIndex2 = ReadUint32(unknownChunk, 0xC);
+            ReadChunk(0x34);
 
             // Read texture names
             for (int j = 0; j < 9; j++) {
@@ -190,37 +161,34 @@ namespace JPAssetReader {
                 }
             }
 
-            unknownChunk = ReadChunk(0x19);
-            string reflectionMap = ReadString();
-            unknownChunk = ReadChunk(0x85);
+            ReadChunk(0x19);
+            string reflMap = ReadString();
+            ReadChunk(0x85);
             string unknownTexture = ReadString();
-            unknownChunk = ReadChunk(0x2B);
-            string subsurfaceTexture = ReadString();
-            unknownChunk = ReadChunk(0x19);
+            ReadChunk(0x2B);
+            string ssTexture = ReadString();
+            ReadChunk(0x19);
 
             return chunk;
         }
 
         /// <summary>
-        /// Reads the material chunk
+        /// Reads the mesh meta
         /// </summary>
-        private void ReadMaterial() {
-            ReadUint32(); // Zero
+        private void ReadMeta() {
+            ReadChunk(0x4);
 
             String materialType = ReadString(4); // Unknown
 
-            ReadChunk(0x1); // 0x01
-            uint mat01 = ReadUint32(); // Unknown
-            uint mat02 = ReadUint32(); // Unknown
-            uint mat03 = ReadUint32(); // Unknown
-
+            ReadChunk(0xD);
+            
             // Parse the 8 file name slots (0: Diffuse, 4: Normal)
             for (int i = 0; i < 8; i++) {
                 byte[] unknown = ReadChunk(4);
                 ReadDependencyBlock(0x32);
             }
 
-            byte[] footer = ReadChunk(0x28); // Unknown
+            byte[] footer = ReadChunk(0x28);
             UVScale = new Vector2(ReadFloat(footer, 0xE), ReadFloat(footer, 0x12));
         }
     }

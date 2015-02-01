@@ -35,13 +35,7 @@ namespace JPAssetReader {
             }
         }
 
-        public void SetName(string name) {
-            foreach (MeshChunk chunk in Chunks) {
-                chunk.Name = name;
-            }
-        }
-
-        public void Combine(Mesh other, string objectName) {
+        public void Combine(Mesh other) {
             uint vertexOffset = (uint)Vertices.Count;
             uint triangleOffset = (uint)Triangles.Count;
             uint chunkOffset = (uint)Chunks.Count;
@@ -57,7 +51,7 @@ namespace JPAssetReader {
 
             foreach (MeshChunk c in other.Chunks) {
                 MeshChunk chunk = new MeshChunk();
-                chunk.Name = objectName;
+                chunk.Name = c.Name;
                 chunk.DiffuseTexture = c.DiffuseTexture;
                 chunk.FaceCount = c.FaceCount;
                 chunk.FaceOffset = c.FaceOffset + triangleOffset;
@@ -83,10 +77,21 @@ namespace JPAssetReader {
                 //objData.Append("vn " + v.Normal.X + " " + v.Normal.Y + " " + v.Normal.Z + "\n");
             }
 
+            string diffuseTexture = "";
+            string lastChunk = "";
+            int chunkIndex = 0;
             foreach (MeshChunk chunk in Chunks) {
-                string chunkName = chunk.Name == null ? "chunk" : chunk.Name;
-                objData.Append("g " + chunk.Name + chunk.Index + "\n");
-                objData.Append("usemtl " + chunk.DiffuseTexture.Replace(".d3dtx", "") + "\n");
+                if (chunk.DiffuseTexture != diffuseTexture || lastChunk != chunk.Name) {
+                    if (lastChunk != chunk.Name) {
+                        chunkIndex = 0; }
+
+                    objData.Append("g " + chunk.Index + "_" + chunk.Name + (chunkIndex > 0 ? chunkIndex.ToString() : "") + "\n");
+                    objData.Append("usemtl m_" + Common.GetFileName(chunk.DiffuseTexture) + "\n");
+                    diffuseTexture = chunk.DiffuseTexture;
+                    lastChunk = chunk.Name;
+                    chunkIndex++;
+                }
+
                 for (uint i = chunk.FaceOffset; i < chunk.FaceOffset + chunk.FaceCount; i++) {
                     Triangle t = Triangles[(int)i];
                     uint v1 = t.V1 + 1;
@@ -100,18 +105,28 @@ namespace JPAssetReader {
             return objData.ToString();
         }
 
-        public string GetMtlData() {
-            StringBuilder mtlData = new StringBuilder();
+        public void SortChunks() {
+            // Sort on diffuse texture
+            Chunks.Sort(delegate(MeshChunk p1, MeshChunk p2) { return p1.DiffuseTexture.CompareTo(p2.DiffuseTexture); });
+        }
+
+        public List<string> GetTextures() {
             List<string> textureList = new List<string>();
             foreach (MeshChunk chunk in Chunks) {
-                string diffuseName = chunk.DiffuseTexture.Replace(".d3dtx", "");
+                string diffuseName = Common.GetFileName(chunk.DiffuseTexture);
                 if (textureList.IndexOf(diffuseName) == -1) {
-                    textureList.Add(diffuseName);
-                }
+                    textureList.Add(diffuseName); }
             }
 
+            return textureList;
+        }
+
+        public string GetMtlData() {
+            StringBuilder mtlData = new StringBuilder();
+            List<string> textureList = GetTextures();
+
             foreach (string texture in textureList) {
-                mtlData.Append("newmtl " + texture + "\n");
+                mtlData.Append("newmtl m_" + texture + "\n");
 
                 // If the color is in the filename, try to parse it
                 string sPattern = "^color_[A-Fa-f0-9]{3,6}$";
@@ -122,7 +137,7 @@ namespace JPAssetReader {
                 }
 
                 mtlData.Append("Kd " + (diffuseColor.R / 255.0f) + " " + (diffuseColor.G / 255.0f) + " " + (diffuseColor.B / 255.0f) + "\n");
-                mtlData.Append("Ka 1.000 1.000 1.000\nKs 0.000 0.000 0.000\nmap_d " + texture + "\n");
+                mtlData.Append("Ka 1.000 1.000 1.000\nKs 0.000 0.000 0.000\nmap_Kd " + texture + ".dds\n");
             }
 
             return mtlData.ToString();

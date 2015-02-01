@@ -12,7 +12,6 @@
  * IN THE SOFTWARE.
 */
 
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Windows.Forms;
@@ -30,20 +29,10 @@ namespace JPAssetReader {
         public string Name;
         public List<SceneObject> Objects;
 
-        public override bool Read(uint subType, FileStream stream) {
-            base.Read(subType, stream);
+        public override bool Read(FileStream stream) {
+            base.Read(stream);
+            ReadChunk(0x1);
 
-            if (subType == 0x6) {
-                ReadChunk(0x49);
-            } else if (subType == 0x9) {
-                ReadChunk(0x6D);
-            } else if (subType == 0xA) {
-                ReadChunk(0x79);
-            } else {
-                MessageBox.Show("Subtype " + ToHex(subType) + " not supported!");
-                return false;
-            }
-            
             // Read the scene name
             Name = ReadString();
 
@@ -59,21 +48,26 @@ namespace JPAssetReader {
             List<SceneObject> objectList = new List<SceneObject>();
             for (i=0; i < objectCount; i++) {
                 SceneObject sceneObject = ReadObject();
+                objectList.Add(sceneObject);
+            }
+
+            // Construct transform hierarchy
+            foreach (SceneObject sceneObject in objectList) {
                 SceneObject parent = null;
                 if (sceneObject.Dependencies.Count == 1 && sceneObject.Dependencies[0].Objects.Count == 1) {
                     string groupName = sceneObject.Dependencies[0].Objects[0];
-                    Console.WriteLine(sceneObject.Name+": "+groupName);
                     parent = objectList.Find(obj => obj.Name.Equals(groupName));
 
                     if (parent != null) {
                         parent.children.Add(sceneObject);
-                    } else {
-                        Objects.Add(sceneObject); }
-                } else {
+                    }
+                    else {
+                        Objects.Add(sceneObject);
+                    }
+                }
+                else {
                     Objects.Add(sceneObject);
                 }
-                
-                objectList.Add(sceneObject);
             }
 
             return true;
@@ -86,47 +80,45 @@ namespace JPAssetReader {
 
             //Console.WriteLine(objectName);
 
-            byte[] unknownChunk = ReadChunk(0x10);
-            uint u10 = ReadUint32(unknownChunk, 0x0);
-            uint u11 = ReadUint32(unknownChunk, 0x4);
-            uint u12 = ReadUint32(unknownChunk, 0xC);
-
+            ReadChunk(0x10);
+            
             obj.Modules = ReadDependencyBlock(0x0, false);
 
-            uint dataSize = ReadUint32();
-            
             //CurrentPos();
             //Console.WriteLine("Size: " + ToHex(dataSize));
-            ObjectData objectData = new ObjectData(ReadChunk(dataSize-0x4), SubType);
-            obj.Dependencies = objectData.Dependencies;
-            obj.Transform = objectData.transform;
+            ObjectMeta meta = ReadObjectMeta();
+            obj.Dependencies = meta.Dependencies;
+            obj.Transform = meta.transform;
+
             return obj;
         }
 
-        private Mesh StripMesh(string path, string propName, string objectName) {
+        private Mesh StripMesh(string propName, string objectName) {
             Mesh mesh = null;
             JurassicReader r = new JurassicReader();
-            if (r.Read(path + "\\" + propName)) {
+            if (r.Read(resourcePath + "\\" + propName)) {
                 List<DependencyList> dependencies = (r.reader as PropReader).Dependencies;
                 foreach (DependencyList dependencyList in dependencies) {
                     foreach (string entry in dependencyList.Objects) {
-                        Console.WriteLine("p:"+entry);
                         // Only load d3dmeshes, for now :)
                         if (Common.GetExtension(entry).Equals("d3dmesh")) {
-                            string meshPath = path + "\\" + entry;
+                            string meshPath = resourcePath + "\\" + entry;
                             if (!File.Exists(meshPath)) {
-                                Console.WriteLine(entry + " does not exist - skipping");
-                                continue;
-                            }
+                                MessageBox.Show("Couldn't find "+entry+"! Please navigate to the JP resource directory.","ERROR!");
+                                AdjustResourcePath();
+                                //Console.WriteLine(entry + " does not exist - skipping");
+                                continue; }
 
                             JurassicReader modelReader = new JurassicReader();
                             if (modelReader.Read(meshPath)) {
                                 Mesh propMesh = modelReader.mesh;
+                                if (propMesh == null) {
+                                    continue; }
+
                                 if (mesh == null) {
                                     mesh = propMesh;
                                 } else {
-                                    mesh.Combine(propMesh,objectName);
-                                }
+                                    mesh.Combine(propMesh); }
                             }
                         }
                     }
@@ -138,37 +130,45 @@ namespace JPAssetReader {
 
         private Mesh ConstructMesh(SceneObject obj, Matrix matrix) {
             Mesh mesh = null;
-            matrix.Translate(obj.Transform.Position);
-            matrix.Scale(obj.Transform.Scale);
-            matrix.Rotate(obj.Transform.Rotation);
 
-            string path = Common.GetPath(_stream.Name);
+            // Make sure to apply the transformations in the right order (TRS)
+            matrix.Translate(obj.Transform.Position);
+            matrix.Rotate(obj.Transform.Rotation);
+            matrix.Scale(obj.Transform.Scale);
+            
             foreach (string file in obj.Modules.Objects) {
-                string propPath = path + "\\" + file;
                 if (Common.GetExtension(file).Equals("prop")) {
-                    if (File.Exists(propPath)) {
-                        mesh = StripMesh(path, file, obj.Name);
+                    string propPath = resourcePath + "\\" + file;
+                    if (!File.Exists(propPath)) {
+                        MessageBox.Show("Couldn't find " + file + "! Please navigate to the JP resource directory.", "ERROR!");
+                        AdjustResourcePath(); }
+
+                    Mesh m = StripMesh(file, obj.Name);
+                        
+                    if (m == null) {
+                        continue; }
+
+                    if (mesh == null) {
+                        mesh = m;
                     } else {
-                        Console.WriteLine(file + " does not exist - skipping");
-                    }
+                        mesh.Combine(m); }
                 }
             }
 
             // Transform the mesh before adding the children
             if (mesh != null) {
-                mesh.Transform(matrix);
-            }
+                mesh.Transform(matrix); }
 
             foreach (SceneObject sceneObject in obj.children) {
                 Mesh childMesh = ConstructMesh(sceneObject, matrix);
 
-                if (childMesh != null) {
-                    if (mesh == null) {
-                        mesh = childMesh;
-                    } else {
-                        mesh.Combine(childMesh,sceneObject.Name);
-                    }
-                }
+                if (childMesh == null) {
+                    continue; }
+
+                if (mesh == null) {
+                    mesh = childMesh;
+                } else {
+                    mesh.Combine(childMesh); }
             }
 
             return mesh;
@@ -176,16 +176,18 @@ namespace JPAssetReader {
 
         public Mesh GetMesh() {
             Mesh m = null;
+
+            resourcePath = Common.GetPath(_stream.Name);
             foreach (SceneObject obj in Objects) {
                 Mesh propMesh = ConstructMesh(obj, Matrix.identity);
                 
-                if (propMesh != null) {
-                    if (m == null) {
-                        m = propMesh;
-                    } else {
-                        m.Combine(propMesh, obj.Name);
-                    }
-                }
+                if (propMesh == null) {
+                    continue; }
+
+                if (m == null) {
+                    m = propMesh;
+                } else {
+                    m.Combine(propMesh); }
             }
 
             return m;

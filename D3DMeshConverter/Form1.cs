@@ -13,32 +13,69 @@
 */
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Windows.Forms;
 
 namespace JPAssetReader {
     public partial class Form1 : Form {
-        private AssetFileDialog fileDialog;
+        private OpenResourceDialog resourceDialog;
+        private OpenResourceDialog textureDialog;
 
         public Form1() {
             InitializeComponent();
-            fileDialog = new AssetFileDialog(System.AppDomain.CurrentDomain.BaseDirectory);
+            string baseDirectory = System.AppDomain.CurrentDomain.BaseDirectory;
+            resourceDialog = new OpenResourceDialog(baseDirectory, "Open JP Resource", "JP Resource Files|*.d3dmesh;*.lang;*.prop;*.scene;*.skl|D3D Mesh|*.d3dmesh|Localization|*.lang|All files (*.*)|*.*");
+            textureDialog = new OpenResourceDialog(baseDirectory, "Open JP texture directory","JP Textures|*.dds|All files (*.*)|*.*");
         }
 
         private JurassicReader ReadFile(string fileName) {
             JurassicReader reader = new JurassicReader();
-            if (!reader.Read(fileDialog.FileName)) {
-                MessageBox.Show(fileDialog.FileName+"\n\nERROR: File encountered an error while parsing!", "Export failed!");
+            if (!reader.Read(resourceDialog.FileName)) {
+                MessageBox.Show(resourceDialog.FileName+"\n\nERROR: File encountered an error while parsing!", "Export failed!");
                 return null;
             }
 
-            string extension = Common.GetExtension(fileDialog.FileName);
-
+            string resourceName = resourceDialog.FileName;
+            string extension = Common.GetExtension(resourceName);
+            
             if (reader.reader is IMeshReader) {
                 Mesh mesh = reader.mesh;
 
+                if (mesh == null) {
+                    return reader; }
+
+                // Fetch missing textures
+                string texType = "dds";
+                List<string> missingTextures = new List<string>();
+                string path = Common.GetPath(resourceName);
+                foreach (string texture in mesh.GetTextures()) {
+                    if (texture.StartsWith("color_")) {
+                        continue; }
+
+                    if (!File.Exists(path + "\\" + texture + "."+texType)) {
+                        missingTextures.Add(texture);
+                    }
+                }
+
+                if (missingTextures.Count > 0) {
+                    MessageBox.Show("Missing "+missingTextures.Count+" texture"+(missingTextures.Count > 1 ? "s" : "")+"! Please specify the texture directory.");
+                    string destinationDir = Common.GetPath(resourceDialog.FileName);
+                    if (textureDialog.Open()) {
+                        string texturePath = Common.GetPath(textureDialog.FileName);
+                        foreach(string texture in missingTextures) {
+                            string textureName = texture+"."+texType;
+                            if(!File.Exists(texturePath+"\\"+textureName)) {
+                                MessageBox.Show("Couldn't locate "+textureName+"!");
+                                continue;
+                            }
+                            File.Copy(texturePath+"\\"+textureName,destinationDir+"\\"+textureName);
+                        }
+                    }
+                }
+
                 // Output the mesh data to a Wavefront OBJ
-                String meshOutputName = fileDialog.FileName.Replace("." + Common.GetExtension(fileDialog.FileName), ".obj");
+                String meshOutputName = resourceName.Replace("." + Common.GetExtension(resourceName), ".obj");
                 String mtlOutputName = meshOutputName.Replace(".obj", ".mtl");
                 String mtlName = mtlOutputName.Substring(mtlOutputName.LastIndexOf("\\") + 1);
                 File.WriteAllText(meshOutputName, mesh.GetObjData(mtlName));
@@ -53,20 +90,20 @@ namespace JPAssetReader {
 
         private void OnConvert(object sender, EventArgs e) {
             // Show the user a file dialog
-            if (!fileDialog.Open()) {
+            if (!resourceDialog.Open()) {
                 return;
             }
 
             // Parse the model data
-            ReadFile(fileDialog.FileName);
+            ReadFile(resourceDialog.FileName);
         }
 
         private void OnMassRead(object sender, EventArgs e) {
-            if (!fileDialog.Open()) {
+            if (!resourceDialog.Open()) {
                 return;
             }
 
-            string fileName = fileDialog.FileName;
+            string fileName = resourceDialog.FileName;
             string fileExtension = Common.GetExtension(fileName);
             string fileDirectory = Common.GetPath(fileName);
 
